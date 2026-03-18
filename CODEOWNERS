@@ -1,0 +1,6 @@
+* @openstrux/spec
+/packages/parser/      @openstrux/spec
+/packages/validator/   @openstrux/spec
+/packages/lock/        @openstrux/spec
+/packages/manifest/    @openstrux/spec
+/tests/                @openstrux/spec

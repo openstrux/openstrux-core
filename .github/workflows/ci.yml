@@ -1,0 +1,22 @@
+name: Core CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  structure-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate package structure
+        run: |
+          for pkg in ast parser validator manifest lock conformance; do
+            test -d "packages/$pkg" || (echo "❌ Missing package: $pkg" && exit 1)
+          done
+          echo "✅ Package structure OK"
+      - name: Validate fixture folders
+        run: |
+          for dir in tests/fixtures/valid tests/fixtures/invalid tests/fixtures/golden; do
+            test -d "$dir" || (echo "❌ Missing: $dir" && exit 1)
+          done
+          echo "✅ Fixture structure OK"

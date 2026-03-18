@@ -1,0 +1,11 @@
+{
+  "name": "openstrux-core",
+  "type": "core",
+  "version": "0.0.1",
+  "depends_on": ["openstrux-spec@0.4.x"],
+  "consumers": [],
+  "benchmark_profile": "core",
+  "compatibility": {
+    "spec": "0.4.x"
+  }
+}
