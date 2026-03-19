@@ -1,7 +1,7 @@
 {
-  "name": "@openstrux/ast",
-  "version": "0.5.0-alpha.0",
-  "description": "Typed AST/IR node definitions for OpenStrux v0.5",
+  "name": "@openstrux/parser",
+  "version": "0.0.0",
+  "description": "OpenStrux .strux source parser",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -13,14 +13,14 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "check": "tsc --noEmit"
   },
-  "files": [
-    "dist",
-    "src"
-  ],
+  "files": ["dist", "src"],
   "license": "Apache-2.0",
+  "dependencies": {
+    "@openstrux/ast": "workspace:*"
+  },
   "devDependencies": {
     "typescript": "^5.7.0",
     "vitest": "^2.0.0"

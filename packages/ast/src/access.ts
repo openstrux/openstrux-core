@@ -87,12 +87,13 @@ export interface Scope {
 export interface ResourceGrant {
   readonly resource: string;
   readonly actions: readonly string[];
-  readonly condition?: string | undefined;
+  /** Conditional access constraints (e.g., { env: "production" }). */
+  readonly conditions?: Record<string, string> | undefined;
 }
 
 export interface TimeWindow {
-  readonly from: string;
-  readonly to: string;
+  readonly from?: string | undefined;
+  readonly to?: string | undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -105,6 +106,10 @@ export interface AccessContext extends NodeBase {
   readonly intent?: Intent | undefined;
   readonly scope?: Scope | undefined;
   readonly policyRef?: string | undefined;
+  /** Request timestamp — WHEN the access occurred. */
+  readonly ts?: string | undefined;
+  /** Whether policy evaluation has been performed. */
+  readonly evaluated?: boolean | undefined;
 }
 
 // ---------------------------------------------------------------------------

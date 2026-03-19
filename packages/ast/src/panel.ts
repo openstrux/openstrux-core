@@ -103,20 +103,31 @@ export interface DpMetadata {
   readonly controllerId?: string | undefined;
   readonly dpo?: string | undefined;
   readonly record?: string | undefined;
-  readonly [key: string]: ValueExpr | string | undefined;
+  /** Lawful basis for processing (e.g., "consent", "contract"). */
+  readonly basis?: string | undefined;
+  /** Field-level sensitivity declarations. */
+  readonly fields?: Record<string, string> | undefined;
+  readonly [key: string]: ValueExpr | Record<string, string> | string | undefined;
 }
 
 /** @ops block — operational defaults (retry, timeout, etc.). */
 export interface OpsConfig {
   readonly retry?: number | undefined;
   readonly timeout?: string | undefined;
-  readonly [key: string]: ValueExpr | string | number | undefined;
+  readonly circuitBreaker?: boolean | undefined;
+  readonly rateLimit?: string | undefined;
+  readonly fallback?: string | undefined;
+  readonly [key: string]: ValueExpr | string | number | boolean | undefined;
 }
 
 /** @cert block — certification metadata (per-component, never inherited). */
 export interface CertMetadata {
   readonly level?: string | undefined;
   readonly scope?: Record<string, string> | undefined;
+  /** Content hash of the certified artifact. */
+  readonly hash?: string | undefined;
+  /** Version string of the certified artifact. */
+  readonly version?: string | undefined;
   readonly [key: string]: ValueExpr | Record<string, string> | string | undefined;
 }
 
