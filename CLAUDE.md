@@ -1,6 +1,6 @@
 # openstrux-core — Core Runtime Library
 
-Parser, validator, AST/IR, manifest, and lock implementation for Openstrux. Implements `openstrux-spec@0.4.x`. Any breaking spec change requires a corresponding update here before merge.
+Parser, validator, AST/IR, manifest, and lock implementation for Openstrux. Implements `openstrux-spec@0.5.x`. Any breaking spec change requires a corresponding update here before merge.
 
 ## Folder guide
 
