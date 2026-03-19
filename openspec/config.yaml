@@ -1,0 +1,26 @@
+schema: spec-driven
+
+context: |
+  openstrux-core - parser, validator, AST/IR, manifest, and lock implementation for Openstrux.
+
+  Implements openstrux-spec@0.4.x. Any breaking spec change in ../openstrux-spec requires
+  a corresponding update here before merge.
+
+  **Folder layout:**
+  - packages/ast/           Typed AST/IR nodes — mirrors spec type system
+  - packages/parser/        .strux source → AST
+  - packages/validator/     Type-checking, snap validation, certification rules
+  - packages/manifest/      mf.strux.json model (version, content hash, cert scope)
+  - packages/lock/          snap.lock semantics and determinism
+  - packages/conformance/   Shared conformance test library
+  - tests/fixtures/valid/   Mirrors ../openstrux-spec/conformance/valid/
+  - tests/fixtures/invalid/ Mirrors ../openstrux-spec/conformance/invalid/
+  - tests/fixtures/golden/  Mirrors ../openstrux-spec/conformance/golden/
+
+  **Key rules:**
+  - packages/ast/ node definitions MUST stay in sync with ../openstrux-spec/specs/core/type-system.md
+  - Conformance fixtures sourced from ../openstrux-spec/conformance/ — do not diverge
+  - Generated artifacts (compiled Beam Python, TypeScript) go to dist/ — never committed
+  - Spec is authoritative over implementation when they conflict
+
+  **Spec reference:** ../openstrux-spec/specs/core/syntax-reference.md
