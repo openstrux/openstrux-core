@@ -27,6 +27,25 @@ importers:
         specifier: ^2.0.0
         version: 2.1.9(@types/node@25.5.0)
 
+  packages/config:
+    dependencies:
+      '@openstrux/ast':
+        specifier: workspace:*
+        version: link:../ast
+      '@openstrux/parser':
+        specifier: workspace:*
+        version: link:../parser
+    devDependencies:
+      '@types/node':
+        specifier: ^25.5.0
+        version: 25.5.0
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@25.5.0)
+
   packages/conformance:
     devDependencies:
       typescript:
@@ -79,7 +98,13 @@ importers:
       '@openstrux/ast':
         specifier: workspace:*
         version: link:../ast
+      '@openstrux/parser':
+        specifier: workspace:*
+        version: link:../parser
     devDependencies:
+      '@types/node':
+        specifier: ^25.5.0
+        version: 25.5.0
       typescript:
         specifier: ^5.7.0
         version: 5.9.3

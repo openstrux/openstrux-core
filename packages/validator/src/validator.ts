@@ -1,0 +1,68 @@
+/**
+ * Main validator orchestrator.
+ * Takes a ParseResult and runs all validation phases.
+ */
+import type { ParseResult, PanelNode } from "@openstrux/parser";
+import type { ValidationDiagnostic } from "./diagnostics.js";
+import { SymbolTable } from "./symbol-table.js";
+import { resolveTypeReferences } from "./type-resolver.js";
+import { checkSnapChain } from "./snap-checker.js";
+import { enforceAccessContext } from "./access-enforcer.js";
+import { validateScope } from "./scope-validator.js";
+import { validateCert } from "./cert-validator.js";
+import type { CertValidationOptions } from "./cert-validator.js";
+import { resolveGuardPolicies } from "./policy-resolver.js";
+import { checkTypeNames } from "./type-name-checker.js";
+
+export interface ValidateOptions extends CertValidationOptions {}
+
+export interface ValidateResult {
+  readonly diagnostics: ValidationDiagnostic[];
+}
+
+/**
+ * Validate a parsed .strux file.
+ *
+ * @param parseResult - Output from @openstrux/parser `parse()`
+ * @param options - Optional validation options
+ * @returns ValidateResult with all semantic diagnostics
+ */
+export function validate(
+  parseResult: ParseResult,
+  options: ValidateOptions = {},
+): ValidateResult {
+  const { ast } = parseResult;
+  const diagnostics: ValidationDiagnostic[] = [];
+
+  // Phase 1: Collect all type declarations into symbol table
+  const symbolTable = new SymbolTable();
+  symbolTable.populate(ast);
+
+  // W003: Non-PascalCase type names
+  diagnostics.push(...checkTypeNames(ast));
+
+  // Extract panels for phase-2 checks
+  const panels: PanelNode[] = ast.filter(
+    (n): n is PanelNode => n.kind === "panel",
+  );
+
+  // V001: Unresolved type references
+  diagnostics.push(...resolveTypeReferences(panels, symbolTable));
+
+  // V002: Snap chain compatibility
+  diagnostics.push(...checkSnapChain(panels));
+
+  // W002: Missing @access block
+  diagnostics.push(...enforceAccessContext(panels));
+
+  // V003: Scope field validation
+  diagnostics.push(...validateScope(panels, symbolTable));
+
+  // E_CERT_HASH_MISMATCH, W_CERT_SCOPE_UNCOVERED
+  diagnostics.push(...validateCert(panels, options));
+
+  // W_POLICY_OPAQUE, W_SCOPE_UNVERIFIED
+  diagnostics.push(...resolveGuardPolicies(panels));
+
+  return { diagnostics };
+}
