@@ -1,3 +1,30 @@
-// @openstrux/parser — stub
-// Implementation pending: v0-6-0-parser change package
-export {};
+/**
+ * @openstrux/parser — public API
+ */
+
+// Parser entry point
+export { parse, Parser } from "./parser.js";
+
+// Types
+export type {
+  Diagnostic,
+  EnumNode,
+  FieldDecl,
+  KnotValue,
+  NodeLoc,
+  PanelAccessNode,
+  PanelNode,
+  ParseResult,
+  ParseTypeExpr,
+  RecordNode,
+  RodNode,
+  StruxNode,
+  UnionNode,
+  UnionVariantDecl,
+} from "./types.js";
+
+export { PRIMITIVE_TYPES } from "./types.js";
+
+// Lexer (for tooling that needs raw tokens)
+export { tokenize, TokenType } from "./lexer.js";
+export type { Token } from "./lexer.js";

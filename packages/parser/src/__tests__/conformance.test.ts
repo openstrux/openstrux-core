@@ -1,0 +1,117 @@
+/**
+ * Conformance test suite for @openstrux/parser.
+ *
+ * Runs the parser against:
+ * - tests/fixtures/valid/  — expects zero diagnostics and at least one AST node
+ * - tests/fixtures/invalid/ — expects diagnostic codes matching *.expected.json
+ *
+ * Fixture files with only comment content (e.g. TODO placeholders) are
+ * also expected to produce zero diagnostics (empty AST is fine).
+ */
+
+import { readFileSync, readdirSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+import { parse } from "../parser.js";
+
+// ---------------------------------------------------------------------------
+// Paths
+// ---------------------------------------------------------------------------
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirnameLocal = dirname(__filename);
+const coreRoot = resolve(__dirnameLocal, "../../../../");
+const validFixturesDir = join(coreRoot, "tests/fixtures/valid");
+const invalidFixturesDir = join(coreRoot, "tests/fixtures/invalid");
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function readSource(path: string): string {
+  return readFileSync(path, "utf-8");
+}
+
+interface ExpectedDiagnostic {
+  code: string;
+  severity?: string;
+}
+
+interface ExpectedJson {
+  diagnostics: ExpectedDiagnostic[];
+}
+
+function readExpected(path: string): ExpectedJson {
+  return JSON.parse(readFileSync(path, "utf-8")) as ExpectedJson;
+}
+
+function struxFiles(dir: string): string[] {
+  return readdirSync(dir)
+    .filter((f: string) => f.endsWith(".strux"))
+    .sort();
+}
+
+// ---------------------------------------------------------------------------
+// Valid fixtures — expect zero diagnostics
+// ---------------------------------------------------------------------------
+
+describe("valid fixtures → zero diagnostics", () => {
+  const files = struxFiles(validFixturesDir);
+
+  if (files.length === 0) {
+    it("(no valid fixtures found)", () => {
+      expect(files.length).toBeGreaterThan(0);
+    });
+  }
+
+  for (const file of files) {
+    it(file, () => {
+      const source = readSource(join(validFixturesDir, file));
+      const result = parse(source);
+      const errors = result.diagnostics.filter((d) => d.severity === "error");
+      expect(errors, `Errors in ${file}: ${JSON.stringify(errors)}`).toHaveLength(0);
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Invalid fixtures — expect matching diagnostic codes
+// ---------------------------------------------------------------------------
+
+describe("invalid fixtures → expected diagnostic codes", () => {
+  const files = struxFiles(invalidFixturesDir);
+
+  if (files.length === 0) {
+    it("(no invalid fixtures found)", () => {
+      expect(files.length).toBeGreaterThan(0);
+    });
+  }
+
+  for (const file of files) {
+    const expectedPath = join(invalidFixturesDir, file.replace(".strux", ".expected.json"));
+
+    it(file, () => {
+      const source = readSource(join(invalidFixturesDir, file));
+      const expected = readExpected(expectedPath);
+      const result = parse(source);
+
+      for (const exp of expected.diagnostics) {
+        const match = result.diagnostics.find((d) => d.code === exp.code);
+        expect(
+          match,
+          `Expected diagnostic code '${exp.code}' in ${file}, got: ${JSON.stringify(result.diagnostics)}`,
+        ).toBeDefined();
+
+        if (exp.severity !== undefined && match !== undefined) {
+          expect(match.severity).toBe(exp.severity);
+        }
+
+        if (match !== undefined) {
+          expect(match.line).toBeGreaterThanOrEqual(1);
+          expect(match.col).toBeGreaterThanOrEqual(1);
+        }
+      }
+    });
+  }
+});
