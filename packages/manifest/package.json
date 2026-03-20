@@ -19,7 +19,8 @@
   "files": ["dist", "src"],
   "license": "Apache-2.0",
   "dependencies": {
-    "@openstrux/ast": "workspace:*"
+    "@openstrux/ast": "workspace:*",
+    "@openstrux/lock": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.7.0",
