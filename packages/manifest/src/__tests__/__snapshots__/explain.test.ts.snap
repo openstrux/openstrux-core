@@ -1,0 +1,34 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`explain — P0 domain model > matches snapshot 1`] = `
+"============================================================
+Panel Explanation: intake-proposals
+============================================================
+
+Access Context
+------------------------------------------------------------
+intent=grant_intake (write, basis=contract)
+
+Steps
+------------------------------------------------------------
+Step 1 [receive] intake
+  Location: p0-domain-model.strux:38:3
+  Description: receive rod: intake
+
+Step 2 [validate] validate-schema
+  Location: p0-domain-model.strux:41:3
+  Description: validate rod: validate-schema
+
+Step 3 [write-data] store-proposal
+  Location: p0-domain-model.strux:44:3
+  Description: write-data rod: store-proposal
+
+------------------------------------------------------------
+Summary
+------------------------------------------------------------
+  Rods: 3
+  Pushdown annotations: 0
+  Escape hatches: 0
+  Policy verification: none
+============================================================"
+`;
