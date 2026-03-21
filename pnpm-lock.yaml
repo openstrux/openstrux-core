@@ -78,6 +78,13 @@ importers:
         version: 2.1.9(@types/node@25.5.0)
 
   packages/lock:
+    dependencies:
+      '@openstrux/ast':
+        specifier: workspace:*
+        version: link:../ast
+      '@openstrux/config':
+        specifier: workspace:*
+        version: link:../config
     devDependencies:
       typescript:
         specifier: ^5.7.0

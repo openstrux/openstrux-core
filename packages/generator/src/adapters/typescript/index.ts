@@ -9,6 +9,7 @@ import type { TypeRecord, TypeEnum, TypeUnion } from "@openstrux/ast";
 import type { Panel, Rod } from "@openstrux/ast";
 import type { TypeExpr } from "@openstrux/ast";
 import type { Adapter, GeneratedFile, GenerateOptions, Manifest, TopLevelNode } from "../../types.js";
+import { dispatchRod, isTier2Rod, TIER2_ROD_TYPES } from "./rods/index.js";
 
 // ---------------------------------------------------------------------------
 // Prisma accumulator — collects all model/enum blocks into one file
@@ -287,13 +288,12 @@ function httpMethod(rod: Rod): string {
 
 function emitRouteFile(
   panelName: string,
-  rods: Rod[]
+  rods: Rod[],
+  panel: Panel
 ): GeneratedFile {
   const kebab = panelName;
   const receiveRod = rods.find(r => r.rodType === "receive");
   const respondRod = rods.find(r => r.rodType === "respond");
-  const storeRods = rods.filter(r => r.rodType === "store");
-  const writeRods = rods.filter(r => r.rodType === "write-data");
   const readRods = rods.filter(r => r.rodType === "read-data");
 
   const method = receiveRod ? httpMethod(receiveRod) : "GET";
@@ -314,22 +314,19 @@ function emitRouteFile(
     lines.push(``);
   }
 
-  for (const rod of storeRods) {
-    lines.push(`// store: ${rod.name}`);
-    lines.push(`// TODO: implement store — prisma.<model>.create({ data: ... })`);
-    lines.push(``);
-  }
-
-  for (const rod of writeRods) {
-    lines.push(`// write-data: ${rod.name}`);
-    lines.push(`// TODO: implement write — prisma.<model>.upsert({ ... })`);
-    lines.push(``);
-  }
-
   for (const rod of readRods) {
     lines.push(`// read-data: ${rod.name}`);
     lines.push(`// TODO: implement read — prisma.<model>.findMany({ where: ... })`);
     lines.push(``);
+  }
+
+  // Rod snippets via dispatch table (skips structural rods: receive, respond, guard, validate)
+  for (const rod of rods) {
+    if (rod.rodType === "read-data") continue; // handled above
+    const snippet = dispatchRod(rod, panel);
+    if (snippet) {
+      lines.push(...snippet.split("\n").map(l => l));
+    }
   }
 
   lines.push(`export async function ${method}(req: NextRequest): Promise<NextResponse> {`);
@@ -442,9 +439,11 @@ function generate(
     const guardRod = rods.find(r => r.rodType === "guard");
     const validateRods = rods.filter(r => r.rodType === "validate");
 
-    // Route file (receive + respond + store + write-data + read-data)
-    if (hasReceive || hasRespond || hasStore || hasWrite || hasRead) {
-      files.push(emitRouteFile(panel.name, rods));
+    // Route file (receive + respond + store + write-data + read-data + call + split)
+    const hasCall = rods.some(r => r.rodType === "call");
+    const hasSplit = rods.some(r => r.rodType === "split");
+    if (hasReceive || hasRespond || hasStore || hasWrite || hasRead || hasCall || hasSplit) {
+      files.push(emitRouteFile(panel.name, rods, panel));
     }
 
     // Guard middleware
@@ -482,7 +481,50 @@ function generate(
     files.push({ path: "prisma/schema.prisma", content, lang: "prisma" });
   }
 
+  // 4. Generator summary
+  emitGeneratorSummary(ast);
+
   return files;
+}
+
+// ---------------------------------------------------------------------------
+// Generator summary — prints rod coverage after generation
+// ---------------------------------------------------------------------------
+
+function emitGeneratorSummary(ast: TopLevelNode[]): void {
+  let tier1Count = 0;
+  let tier2Count = 0;
+  const stubPanels: string[] = [];
+
+  for (const node of ast) {
+    if (node.kind !== "Panel") continue;
+    const panel = node as Panel;
+    const rods = panel.rods as Rod[];
+    let panelHasStub = false;
+
+    for (const rod of rods) {
+      if (isTier2Rod(rod.rodType)) {
+        tier2Count++;
+        panelHasStub = true;
+      } else if (!TIER2_ROD_TYPES.has(rod.rodType)) {
+        tier1Count++;
+      }
+    }
+
+    if (panelHasStub) stubPanels.push(panel.name);
+  }
+
+  if (tier1Count === 0 && tier2Count === 0) return;
+
+  console.log(
+    `[openstrux-generator] Summary: ${tier1Count} Tier 1 rod(s) emitted, ` +
+    `${tier2Count} Tier 2 stub(s) emitted`
+  );
+  if (stubPanels.length > 0) {
+    console.log(
+      `[openstrux-generator] Non-demo-capable panels (contain Tier 2 stubs): ${stubPanels.join(", ")}`
+    );
+  }
 }
 
 export const TypeScriptAdapter: Adapter = { generate };

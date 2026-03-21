@@ -86,10 +86,11 @@ const MOCK_SOURCE_FILE: SourceFile = {
 };
 
 const MOCK_LOCK: SnapLock = {
-  schemaVersion: "0.6",
+  lockVersion: "0.6",
+  specVersion: "0.6.0",
+  generatedAt: "2026-01-01T00:00:00.000Z",
   sourceHash: "abc123deadbeef",
-  timestamp: "2026-01-01T00:00:00.000Z",
-  dependencies: {},
+  entries: [],
 };
 
 // ---------------------------------------------------------------------------
