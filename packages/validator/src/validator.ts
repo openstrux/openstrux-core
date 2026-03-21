@@ -13,6 +13,9 @@ import { validateCert } from "./cert-validator.js";
 import type { CertValidationOptions } from "./cert-validator.js";
 import { resolveGuardPolicies } from "./policy-resolver.js";
 import { checkTypeNames } from "./type-name-checker.js";
+import { validateOpsBlocks } from "./ops-schema.js";
+import { validateSchemaRefs } from "./schema-ref-validator.js";
+import { validateStreamConfigs } from "./stream-validator.js";
 
 export interface ValidateOptions extends CertValidationOptions {}
 
@@ -63,6 +66,15 @@ export function validate(
 
   // W_POLICY_OPAQUE, W_SCOPE_UNVERIFIED
   diagnostics.push(...resolveGuardPolicies(panels));
+
+  // E_OPS_UNKNOWN_FIELD, E_OPS_TYPE_MISMATCH — rod-level @ops field validation
+  diagnostics.push(...validateOpsBlocks(panels));
+
+  // E_SCHEMA_STRING, E_SCHEMA_UNRESOLVED — validate rod schema ref resolution
+  diagnostics.push(...validateSchemaRefs(panels, symbolTable));
+
+  // E_STREAM_MISSING_FIELD, E_STREAM_UNKNOWN_ADAPTER — stream target config validation
+  diagnostics.push(...validateStreamConfigs(panels));
 
   return { diagnostics };
 }

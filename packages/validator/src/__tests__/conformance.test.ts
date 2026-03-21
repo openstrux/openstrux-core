@@ -21,6 +21,7 @@ const invalidFixturesDir = join(coreRoot, "tests/fixtures/invalid");
 interface ExpectedDiagnostic {
   code: string;
   severity?: string;
+  messageContains?: string;
 }
 interface ExpectedJson {
   diagnostics: ExpectedDiagnostic[];
@@ -76,8 +77,15 @@ describe("invalid fixtures → expected validator diagnostic codes", () => {
       ];
 
       for (const exp of expected.diagnostics) {
-        const match = allDiagnostics.find((d) => d.code === exp.code);
-        expect(match, `Expected diagnostic ${exp.code} in ${file}`).toBeDefined();
+        const match = allDiagnostics.find(
+          (d) =>
+            d.code === exp.code &&
+            (exp.messageContains === undefined || d.message.includes(exp.messageContains)),
+        );
+        expect(
+          match,
+          `Expected diagnostic ${exp.code}${exp.messageContains ? ` containing "${exp.messageContains}"` : ""} in ${file}. Got: ${JSON.stringify(allDiagnostics.map((d) => ({ code: d.code, message: d.message })))}`,
+        ).toBeDefined();
         if (match !== undefined && exp.severity !== undefined) {
           expect(match.severity).toBe(exp.severity);
         }

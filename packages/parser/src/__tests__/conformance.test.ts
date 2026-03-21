@@ -36,11 +36,15 @@ function readSource(path: string): string {
 interface ExpectedDiagnostic {
   code: string;
   severity?: string;
+  messageContains?: string;
 }
 
 interface ExpectedJson {
   diagnostics: ExpectedDiagnostic[];
 }
+
+/** Diagnostic codes emitted by the parser (not the validator). */
+const PARSER_CODES = new Set(["E000", "E001", "E002", "E003", "W001"]);
 
 function readExpected(path: string): ExpectedJson {
   return JSON.parse(readFileSync(path, "utf-8")) as ExpectedJson;
@@ -97,6 +101,9 @@ describe("invalid fixtures → expected diagnostic codes", () => {
       const result = parse(source);
 
       for (const exp of expected.diagnostics) {
+        // Skip validator-level diagnostic codes — those are checked by the validator conformance test.
+        if (!PARSER_CODES.has(exp.code)) continue;
+
         const match = result.diagnostics.find((d) => d.code === exp.code);
         expect(
           match,

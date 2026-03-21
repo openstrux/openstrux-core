@@ -4,6 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { parseContextFile } from "../context-parser.js";
 import { mergeDp, mergeAccess, mergeOps } from "../merge.js";
+import { resolveRodOps } from "../resolver.js";
 
 // ---------------------------------------------------------------------------
 // parseContextFile tests
@@ -181,5 +182,41 @@ describe("mergeOps — nearest wins (CI-004)", () => {
     const result = mergeOps([root, folder]);
     expect(result["retry"]).toEqual({ kind: "number", value: 5 });
     expect(result["timeout"]).toEqual({ kind: "string", value: "30s" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveRodOps — rod @ops wins over panel @ops wins over context @ops
+// ---------------------------------------------------------------------------
+
+describe("resolveRodOps — context → panel → rod cascade", () => {
+  it("rod @ops overrides panel @ops", () => {
+    const contextOps = { retry: { kind: "number" as const, value: 1 } };
+    const panelOps = { retry: { kind: "number" as const, value: 3 } };
+    const rodOps = { retry: { kind: "number" as const, value: 5 } };
+    const result = resolveRodOps(contextOps, panelOps, rodOps);
+    expect(result["retry"]).toEqual({ kind: "number", value: 5 });
+  });
+
+  it("rod @ops merges with context @ops (rod wins on conflict)", () => {
+    const contextOps = {
+      retry: { kind: "number" as const, value: 2 },
+      timeout: { kind: "string" as const, value: "30s" },
+    };
+    const panelOps = {};
+    const rodOps = { retry: { kind: "number" as const, value: 10 } };
+    const result = resolveRodOps(contextOps, panelOps, rodOps);
+    // rod wins on retry
+    expect(result["retry"]).toEqual({ kind: "number", value: 10 });
+    // context timeout is inherited
+    expect(result["timeout"]).toEqual({ kind: "string", value: "30s" });
+  });
+
+  it("panel @ops overrides context @ops when rod has no @ops", () => {
+    const contextOps = { retry: { kind: "number" as const, value: 1 } };
+    const panelOps = { retry: { kind: "number" as const, value: 4 } };
+    const rodOps = {};
+    const result = resolveRodOps(contextOps, panelOps, rodOps);
+    expect(result["retry"]).toEqual({ kind: "number", value: 4 });
   });
 });

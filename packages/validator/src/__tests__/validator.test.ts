@@ -199,6 +199,209 @@ describe("SymbolTable", () => {
 });
 
 // ---------------------------------------------------------------------------
+// E_OPS_UNKNOWN_FIELD, E_OPS_TYPE_MISMATCH — rod-level @ops validation
+// ---------------------------------------------------------------------------
+
+describe("@ops field validation (rod-level)", () => {
+  it("emits no errors for valid @ops fields", () => {
+    const src = `@panel p {
+  @access { purpose: "test", operation: "read" }
+  r = call {
+    @ops { retry: 3, timeout: 30s }
+    endpoint: "https://api.example.com"
+  }
+}`;
+    const result = validate(parse(src));
+    const ops = result.diagnostics.filter(
+      (d) => d.code === "E_OPS_UNKNOWN_FIELD" || d.code === "E_OPS_TYPE_MISMATCH",
+    );
+    expect(ops).toHaveLength(0);
+  });
+
+  it("emits E_OPS_UNKNOWN_FIELD for an unrecognized @ops field", () => {
+    const src = `@panel p {
+  @access { purpose: "test", operation: "read" }
+  r = call {
+    @ops { max_errors: 5 }
+  }
+}`;
+    const result = validate(parse(src));
+    const diag = result.diagnostics.find((d) => d.code === "E_OPS_UNKNOWN_FIELD");
+    expect(diag).toBeDefined();
+    expect(diag?.message).toContain("max_errors");
+  });
+
+  it("emits E_OPS_TYPE_MISMATCH when retry is a string", () => {
+    const src = `@panel p {
+  @access { purpose: "test", operation: "read" }
+  r = call {
+    @ops { retry: "five" }
+  }
+}`;
+    const result = validate(parse(src));
+    const diag = result.diagnostics.find((d) => d.code === "E_OPS_TYPE_MISMATCH");
+    expect(diag).toBeDefined();
+    expect(diag?.message).toContain("retry");
+  });
+
+  it("emits E_OPS_TYPE_MISMATCH when timeout is a number instead of duration", () => {
+    const src = `@panel p {
+  @access { purpose: "test", operation: "read" }
+  r = call {
+    @ops { timeout: 30 }
+  }
+}`;
+    const result = validate(parse(src));
+    const diag = result.diagnostics.find((d) => d.code === "E_OPS_TYPE_MISMATCH");
+    expect(diag).toBeDefined();
+    expect(diag?.message).toContain("timeout");
+  });
+
+  it("validates nested record fields (circuit_breaker.threshold)", () => {
+    const src = `@panel p {
+  @access { purpose: "test", operation: "read" }
+  r = call {
+    @ops { circuit_breaker: { threshold: 5, window: 1m } }
+  }
+}`;
+    const result = validate(parse(src));
+    const ops = result.diagnostics.filter(
+      (d) => d.code === "E_OPS_UNKNOWN_FIELD" || d.code === "E_OPS_TYPE_MISMATCH",
+    );
+    expect(ops).toHaveLength(0);
+  });
+
+  it("emits E_OPS_TYPE_MISMATCH for wrong circuit_breaker subfield type", () => {
+    const src = `@panel p {
+  @access { purpose: "test", operation: "read" }
+  r = call {
+    @ops { circuit_breaker: { threshold: "high", window: 1m } }
+  }
+}`;
+    const result = validate(parse(src));
+    const diag = result.diagnostics.find((d) => d.code === "E_OPS_TYPE_MISMATCH");
+    expect(diag).toBeDefined();
+    expect(diag?.message).toContain("circuit_breaker.threshold");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// E_SCHEMA_STRING, E_SCHEMA_UNRESOLVED — validate rod schema ref
+// ---------------------------------------------------------------------------
+
+describe("SchemaRef validation", () => {
+  it("emits E_SCHEMA_STRING when schema is a string literal", () => {
+    const src = `@panel p {
+  @access { purpose: "test", operation: "read" }
+  r = validate { schema: "UserPayload" }
+}`;
+    const result = validate(parse(src));
+    const diag = result.diagnostics.find((d) => d.code === "E_SCHEMA_STRING");
+    expect(diag).toBeDefined();
+    expect(diag?.message).toContain("UserPayload");
+  });
+
+  it("emits E_SCHEMA_UNRESOLVED when schema identifier is not a declared @type", () => {
+    const src = `@panel p {
+  @access { purpose: "test", operation: "read" }
+  r = validate { schema: NonExistentType }
+}`;
+    const result = validate(parse(src));
+    const diag = result.diagnostics.find((d) => d.code === "E_SCHEMA_UNRESOLVED");
+    expect(diag).toBeDefined();
+    expect(diag?.message).toContain("NonExistentType");
+  });
+
+  it("emits no schema errors for valid @type SchemaRef", () => {
+    const src = `
+@type UserPayload { id: string, name: string }
+@panel p {
+  @access { purpose: "test", operation: "write" }
+  r = validate { schema: UserPayload }
+}`;
+    const result = validate(parse(src));
+    const schemaErrors = result.diagnostics.filter(
+      (d) => d.code === "E_SCHEMA_STRING" || d.code === "E_SCHEMA_UNRESOLVED",
+    );
+    expect(schemaErrors).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// E_STREAM_MISSING_FIELD — stream config validation
+// ---------------------------------------------------------------------------
+
+describe("stream config validation (write-data targets)", () => {
+  it("emits no errors for valid kafka config", () => {
+    const src = `@panel p {
+  @access { purpose: "test", operation: "write" }
+  w = write-data { target: stream.kafka { brokers: "b:9092", topic: "events" } }
+}`;
+    const result = validate(parse(src));
+    const streamErrors = result.diagnostics.filter(
+      (d) => d.code === "E_STREAM_MISSING_FIELD" || d.code === "E_STREAM_UNKNOWN_ADAPTER",
+    );
+    expect(streamErrors).toHaveLength(0);
+  });
+
+  it("emits E_STREAM_MISSING_FIELD when kafka is missing brokers", () => {
+    const src = `@panel p {
+  @access { purpose: "test", operation: "write" }
+  w = write-data { target: stream.kafka { topic: "events" } }
+}`;
+    const result = validate(parse(src));
+    const diag = result.diagnostics.find((d) => d.code === "E_STREAM_MISSING_FIELD");
+    expect(diag).toBeDefined();
+    expect(diag?.message).toContain("brokers");
+  });
+
+  it("emits E_STREAM_MISSING_FIELD when pubsub is missing required fields", () => {
+    const src = `@panel p {
+  @access { purpose: "test", operation: "write" }
+  w = write-data { target: stream.pubsub { project: "my-proj" } }
+}`;
+    const result = validate(parse(src));
+    const diag = result.diagnostics.find((d) => d.code === "E_STREAM_MISSING_FIELD");
+    expect(diag).toBeDefined();
+    expect(diag?.message).toContain("topic");
+  });
+
+  it("emits E_STREAM_MISSING_FIELD for kinesis missing region", () => {
+    const src = `@panel p {
+  @access { purpose: "test", operation: "write" }
+  w = write-data { target: stream.kinesis { stream_name: "my-stream" } }
+}`;
+    const result = validate(parse(src));
+    const diag = result.diagnostics.find((d) => d.code === "E_STREAM_MISSING_FIELD");
+    expect(diag).toBeDefined();
+    expect(diag?.message).toContain("region");
+  });
+
+  it("emits E_STREAM_UNKNOWN_ADAPTER for unknown stream adapter", () => {
+    const src = `@panel p {
+  @access { purpose: "test", operation: "write" }
+  w = write-data { target: stream.rabbitmq { queue: "events" } }
+}`;
+    const result = validate(parse(src));
+    const diag = result.diagnostics.find((d) => d.code === "E_STREAM_UNKNOWN_ADAPTER");
+    expect(diag).toBeDefined();
+    expect(diag?.message).toContain("rabbitmq");
+  });
+
+  it("does NOT emit stream errors for db targets (non-stream)", () => {
+    const src = `@panel p {
+  @access { purpose: "test", operation: "write" }
+  w = write-data { target: db.sql.postgres { host: "h", port: 5432 } }
+}`;
+    const result = validate(parse(src));
+    const streamErrors = result.diagnostics.filter(
+      (d) => d.code === "E_STREAM_MISSING_FIELD" || d.code === "E_STREAM_UNKNOWN_ADAPTER",
+    );
+    expect(streamErrors).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // classifyPolicyTier
 // ---------------------------------------------------------------------------
 

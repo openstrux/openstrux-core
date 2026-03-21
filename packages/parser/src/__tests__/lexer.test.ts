@@ -216,6 +216,58 @@ describe("location tracking", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Duration literals
+// ---------------------------------------------------------------------------
+
+describe("duration literals", () => {
+  it("tokenises 5m as DURATION", () => {
+    expect(types("5m")).toEqual([TokenType.DURATION]);
+    expect(values("5m")).toEqual(["5m"]);
+  });
+
+  it("tokenises 30s as DURATION", () => {
+    expect(types("30s")).toEqual([TokenType.DURATION]);
+    expect(values("30s")).toEqual(["30s"]);
+  });
+
+  it("tokenises 24h as DURATION", () => {
+    expect(types("24h")).toEqual([TokenType.DURATION]);
+    expect(values("24h")).toEqual(["24h"]);
+  });
+
+  it("tokenises 7d as DURATION", () => {
+    expect(types("7d")).toEqual([TokenType.DURATION]);
+    expect(values("7d")).toEqual(["7d"]);
+  });
+
+  it("tokenises 0s as DURATION (zero value is valid)", () => {
+    expect(types("0s")).toEqual([TokenType.DURATION]);
+    expect(values("0s")).toEqual(["0s"]);
+  });
+
+  it("5 m (with space) produces NUMBER + IDENT — not DURATION", () => {
+    expect(types("5 m")).toEqual([TokenType.NUMBER, TokenType.IDENT]);
+    expect(values("5 m")).toEqual(["5", "m"]);
+  });
+
+  it("5x produces NUMBER + IDENT — x is not a duration unit", () => {
+    expect(types("5x")).toEqual([TokenType.NUMBER, TokenType.IDENT]);
+    expect(values("5x")).toEqual(["5", "x"]);
+  });
+
+  it("5ms produces NUMBER + IDENT — m is immediately followed by s (ident char)", () => {
+    expect(types("5ms")).toEqual([TokenType.NUMBER, TokenType.IDENT]);
+    expect(values("5ms")).toEqual(["5", "ms"]);
+  });
+
+  it("duration in colon context: timeout: 30s", () => {
+    const toks = tokenize("timeout: 30s").filter((t) => t.type !== TokenType.EOF);
+    expect(toks.map((t) => t.type)).toEqual([TokenType.IDENT, TokenType.COLON, TokenType.DURATION]);
+    expect(toks[2]?.value).toBe("30s");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Comments
 // ---------------------------------------------------------------------------
 

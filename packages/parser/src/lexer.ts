@@ -43,6 +43,7 @@ export enum TokenType {
   // Literals
   STRING = "STRING",
   NUMBER = "NUMBER",
+  DURATION = "DURATION",
 
   // Identifiers (includes language keywords like `enum`, `union`, `true`, `false`)
   IDENT = "IDENT",
@@ -207,13 +208,29 @@ export function tokenize(source: string): Token[] {
       continue;
     }
 
-    // ---- Number literals (no negative — handled as UNKNOWN '-' + NUMBER) ----
+    // ---- Number literals and duration literals ----
+    // Duration: greedy match of digit+ ("s"|"m"|"h"|"d") with no whitespace.
+    // Rule: `5m` → DURATION; `5 m` → NUMBER + IDENT; `5ms` → NUMBER + IDENT.
+    // Only emit DURATION if the unit char is not followed by another identifier char.
     if (/[0-9]/.test(ch)) {
       let num = "";
       while (s.pos < source.length && /[0-9]/.test(charAt(source, s.pos))) {
         num += charAt(source, s.pos);
         s.pos++;
         s.col++;
+      }
+      // Check for duration suffix: exactly one of s|m|h|d, not followed by ident char
+      const durationUnit = charAt(source, s.pos);
+      const afterUnit = charAt(source, s.pos + 1);
+      if (
+        /[smhd]/.test(durationUnit) &&
+        !isIdentChar(afterUnit)
+      ) {
+        num += durationUnit;
+        s.pos++;
+        s.col++;
+        emit(TokenType.DURATION, num, startLine, startCol, startPos);
+        continue;
       }
       if (s.pos < source.length && charAt(source, s.pos) === ".") {
         num += ".";

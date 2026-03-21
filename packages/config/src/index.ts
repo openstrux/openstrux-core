@@ -20,4 +20,4 @@ export {
   mergeAccess,
   mergeEndpoints,
 } from "./merge.js";
-export { resolveContext, resolveNamedEndpoint } from "./resolver.js";
+export { resolveContext, resolveNamedEndpoint, resolveRodOps } from "./resolver.js";

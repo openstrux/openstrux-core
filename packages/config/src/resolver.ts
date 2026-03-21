@@ -83,6 +83,19 @@ export function resolveContext(
 }
 
 /**
+ * Resolve @ops for a specific rod, merging the context→panel→rod cascade.
+ * Rod-level @ops wins over panel @ops wins over context @ops (nearest wins).
+ * CI-rod-ops: rod-level @ops merge.
+ */
+export function resolveRodOps(
+  contextOps: Record<string, KnotValue>,
+  panelOps: Record<string, KnotValue>,
+  rodOps: Record<string, KnotValue>,
+): Record<string, KnotValue> {
+  return mergeOps([contextOps, panelOps, rodOps]);
+}
+
+/**
  * Resolve a named source/target reference like `@production`.
  * If the name is not found, returns null and the caller emits a compile error.
  * CI-005

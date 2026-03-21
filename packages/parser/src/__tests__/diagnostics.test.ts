@@ -152,6 +152,90 @@ describe("W001 — missing @access block", () => {
 });
 
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Duration literal in parser
+// ---------------------------------------------------------------------------
+
+describe("duration literal parsing", () => {
+  it("parses duration in cfg position (cfg.size = 5m)", () => {
+    const result = parse(`@panel p {
+  @access { purpose: "test", operation: "read" }
+  w = window { size: 5m }
+}`);
+    expect(result.diagnostics.filter((d) => d.severity === "error")).toHaveLength(0);
+    const panel = result.ast.find((n) => n.kind === "panel");
+    const rod = (panel as { rods: { name: string; knots: Record<string, { kind: string; value?: number; unit?: string }> }[] } | undefined)?.rods.find((r) => r.name === "w");
+    const sizeKnot = rod?.knots["size"];
+    expect(sizeKnot?.kind).toBe("duration");
+    expect(sizeKnot?.value).toBe(5);
+    expect((sizeKnot as { unit?: string } | undefined)?.unit).toBe("m");
+  });
+
+  it("parses duration in @ops context (timeout: 30s) — rod-level @ops", () => {
+    const result = parse(`@panel p {
+  @access { purpose: "test", operation: "read" }
+  r = read-data {
+    @ops { timeout: 30s }
+    source: db.sql.postgres {}
+  }
+}`);
+    expect(result.diagnostics.filter((d) => d.severity === "error")).toHaveLength(0);
+    const panel = result.ast.find((n) => n.kind === "panel");
+    const rod = (panel as { rods: { name: string; ops?: Record<string, { kind: string; value?: number; unit?: string }> }[] } | undefined)?.rods.find((r) => r.name === "r");
+    const timeoutOps = rod?.ops?.["timeout"];
+    expect(timeoutOps?.kind).toBe("duration");
+    expect(timeoutOps?.value).toBe(30);
+    expect((timeoutOps as { unit?: string } | undefined)?.unit).toBe("s");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Rod-level @ops
+// ---------------------------------------------------------------------------
+
+describe("rod-level @ops parsing", () => {
+  it("parses rod with inline @ops only", () => {
+    const result = parse(`@panel p {
+  @access { purpose: "test", operation: "read" }
+  r = call {
+    @ops { retry: 3, timeout: 10s }
+  }
+}`);
+    expect(result.diagnostics.filter((d) => d.severity === "error")).toHaveLength(0);
+    const panel = result.ast.find((n) => n.kind === "panel");
+    const rod = (panel as { rods: { name: string; ops?: Record<string, { kind: string; value?: unknown }> }[] } | undefined)?.rods.find((r) => r.name === "r");
+    expect(rod?.ops?.["retry"]?.kind).toBe("number");
+    expect(rod?.ops?.["retry"]?.value).toBe(3);
+  });
+
+  it("parses rod with @ops and regular fields", () => {
+    const result = parse(`@panel p {
+  @access { purpose: "test", operation: "read" }
+  r = read-data {
+    @ops { retry: 2 }
+    source: db.sql.postgres {}
+  }
+}`);
+    expect(result.diagnostics.filter((d) => d.severity === "error")).toHaveLength(0);
+    const panel = result.ast.find((n) => n.kind === "panel");
+    const rod = (panel as { rods: { name: string; knots: Record<string, unknown>; ops?: Record<string, { kind: string; value?: unknown }> }[] } | undefined)?.rods.find((r) => r.name === "r");
+    expect(rod?.ops).toBeDefined();
+    expect(rod?.ops?.["retry"]?.value).toBe(2);
+    expect(rod?.knots["source"]).toBeDefined();
+  });
+
+  it("parses rod without @ops (ops field is undefined)", () => {
+    const result = parse(`@panel p {
+  @access { purpose: "test", operation: "read" }
+  r = read-data { source: db.sql.postgres {} }
+}`);
+    const panel = result.ast.find((n) => n.kind === "panel");
+    const rod = (panel as { rods: { name: string; ops?: unknown }[] } | undefined)?.rods.find((r) => r.name === "r");
+    expect(rod?.ops).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // no-throw guarantee
 // ---------------------------------------------------------------------------
 

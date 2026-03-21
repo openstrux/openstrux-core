@@ -107,6 +107,7 @@ export interface UnionNode {
  * Value of a knot (cfg key, arg key, @dp key, @access key).
  *
  * - string / number / bool: literal values
+ * - duration: typed duration literal, e.g. `5m`, `30s`, `24h`, `7d`
  * - path: identifier path (optionally with inline config block),
  *   e.g. `db.sql.postgres { host: "x" }` or just `Proposal`
  * - raw-expr: expression shorthand captured verbatim, e.g. `status == "submitted"`
@@ -116,6 +117,7 @@ export type KnotValue =
   | { kind: "string"; value: string }
   | { kind: "number"; value: number }
   | { kind: "bool"; value: boolean }
+  | { kind: "duration"; value: number; unit: "s" | "m" | "h" | "d" }
   | { kind: "path"; segments: string[]; config?: Record<string, KnotValue> | undefined }
   | { kind: "raw-expr"; text: string }
   | { kind: "block"; config: Record<string, KnotValue> };
@@ -138,6 +140,8 @@ export interface RodNode {
   readonly name: string;
   readonly rodType: string;
   readonly knots: Record<string, KnotValue>;
+  /** Rod-level @ops decorator. Wins over panel @ops in merge cascade. */
+  readonly ops?: Record<string, KnotValue> | undefined;
   readonly loc?: NodeLoc | undefined;
 }
 

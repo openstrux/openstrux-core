@@ -495,7 +495,7 @@ export class Parser {
   // Rod parsing
   // -------------------------------------------------------------------------
 
-  /** Parse `name = rod-type { knots }`. */
+  /** Parse `name = rod-type { knots }`. Handles optional nested `@ops { ... }` inside rod body. */
   private parseRod(): RodNode | null {
     const nameTok = this.consume(); // consume rod name
     const rodName = nameTok.value;
@@ -523,9 +523,61 @@ export class Parser {
       );
     }
 
-    const knots = this.parseKnotBlock();
+    // Parse rod body: { key: value pairs, and optionally @ops { ... } }
+    const { knots, ops } = this.parseRodBody();
 
-    return { kind: "rod", name: rodName, rodType, knots, loc: this.loc(nameTok) };
+    return { kind: "rod", name: rodName, rodType, knots, ops, loc: this.loc(nameTok) };
+  }
+
+  /**
+   * Parse a rod body block `{ ... }`, allowing both `key: value` pairs
+   * and a nested `@ops { ... }` decorator block.
+   */
+  private parseRodBody(): { knots: Record<string, KnotValue>; ops: Record<string, KnotValue> | undefined } {
+    const knots: Record<string, KnotValue> = {};
+    let ops: Record<string, KnotValue> | undefined;
+
+    if (this.peek().type !== TokenType.LBRACE) {
+      this.addError("E000", "Expected '{' for rod body", this.peek());
+      return { knots, ops };
+    }
+    this.consume(); // consume {
+
+    this.skipNewlines();
+    while (this.peek().type !== TokenType.RBRACE && this.peek().type !== TokenType.EOF) {
+      if (this.peek().type === TokenType.NEWLINE) { this.consume(); continue; }
+
+      // @ops decorator inside rod body
+      if (this.peek().type === TokenType.AT_UNKNOWN && this.peek().value === "@ops") {
+        this.consume(); // consume @ops
+        ops = this.parseKnotBlock();
+        this.skipNewlines();
+        continue;
+      }
+
+      const keyTok = this.peek();
+      if (keyTok.type !== TokenType.IDENT) {
+        this.addError("E000", `Expected key in rod body, got ${JSON.stringify(keyTok.value)}`, keyTok);
+        this.recover();
+        break;
+      }
+      this.consume(); // consume key
+      const key = keyTok.value;
+
+      if (this.expect(TokenType.COLON, `':' after key '${key}'`) === null) {
+        this.recover();
+        continue;
+      }
+
+      const value = this.parseKnotValue(key);
+      knots[key] = value;
+
+      if (this.peek().type === TokenType.COMMA) this.consume();
+      this.skipNewlines();
+    }
+
+    this.expect(TokenType.RBRACE, "closing '}' of rod body");
+    return { knots, ops };
   }
 
   // -------------------------------------------------------------------------
@@ -556,6 +608,15 @@ export class Parser {
     if (tok.type === TokenType.NUMBER) {
       this.consume();
       return { kind: "number", value: parseFloat(tok.value) };
+    }
+
+    // Duration literal: e.g. "5m", "30s", "24h", "7d"
+    if (tok.type === TokenType.DURATION) {
+      this.consume();
+      const raw = tok.value; // e.g. "5m"
+      const unit = raw[raw.length - 1] as "s" | "m" | "h" | "d";
+      const value = parseFloat(raw.slice(0, -1));
+      return { kind: "duration", value, unit };
     }
 
     // Identifier — could be bool, type path, or start of expression

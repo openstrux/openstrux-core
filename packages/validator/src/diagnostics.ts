@@ -13,6 +13,18 @@
  *   W_CERT_SCOPE_UNCOVERED  Panel uses type path not covered by @cert scope
  *   W_POLICY_OPAQUE     Guard references external or unreachable hub policy
  *   W_SCOPE_UNVERIFIED  Scope fields in policy cannot be statically confirmed
+ *
+ *   @ops validation (v0.6.0):
+ *   E_OPS_UNKNOWN_FIELD   Unrecognized field in @ops decorator block
+ *   E_OPS_TYPE_MISMATCH   @ops field value has wrong type (e.g., retry: "five")
+ *
+ *   validate rod schema ref (v0.6.0):
+ *   E_SCHEMA_STRING       validate.schema uses string literal; must be identifier
+ *   E_SCHEMA_UNRESOLVED   validate.schema identifier not declared as @type
+ *
+ *   stream/write-data config (v0.6.0):
+ *   E_STREAM_MISSING_FIELD   Required field missing in stream adapter config
+ *   E_STREAM_UNKNOWN_ADAPTER Unrecognized stream adapter type
  */
 export interface ValidationDiagnostic {
   readonly code: string;
@@ -37,4 +49,10 @@ export type DiagnosticCode =
   | "E_CERT_HASH_MISMATCH"
   | "W_CERT_SCOPE_UNCOVERED"
   | "W_POLICY_OPAQUE"
-  | "W_SCOPE_UNVERIFIED";
+  | "W_SCOPE_UNVERIFIED"
+  | "E_OPS_UNKNOWN_FIELD"
+  | "E_OPS_TYPE_MISMATCH"
+  | "E_SCHEMA_STRING"
+  | "E_SCHEMA_UNRESOLVED"
+  | "E_STREAM_MISSING_FIELD"
+  | "E_STREAM_UNKNOWN_ADAPTER";

@@ -48,6 +48,7 @@ function promoteKnotValue(kv: KnotValue): unknown {
   if (kv.kind === "string")   return { kind: "LitString", value: kv.value };
   if (kv.kind === "number")   return { kind: "LitNumber", value: kv.value };
   if (kv.kind === "bool")     return { kind: "LitBool", value: kv.value };
+  if (kv.kind === "duration") return { kind: "LitDuration", value: kv.value, unit: kv.unit };
   if (kv.kind === "path")     return { kind: "TypeRef", name: kv.segments.join("."), segments: kv.segments, config: kv.config ? promoteBlock(kv.config) : undefined };
   if (kv.kind === "raw-expr") return { kind: "RawExpr", text: kv.text };
   // block
