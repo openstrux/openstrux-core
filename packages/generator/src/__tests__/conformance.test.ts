@@ -6,7 +6,7 @@
  *   2. Trim trailing whitespace per line
  *   3. Sort import statements alphabetically within each import block
  *
- * Test fixtures: tests/fixtures/golden/target-ts/
+ * Test fixtures: tests/fixtures/golden/target-nextjs/
  * Input: tests/fixtures/valid/p0-domain-model.strux
  */
 
@@ -15,12 +15,12 @@ import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it, expect } from "vitest";
 import { parse } from "@openstrux/parser";
-import { generate, promote } from "../index.js";
+import { build, promote } from "../index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirnameLocal = dirname(__filename);
 const coreRoot = resolve(__dirnameLocal, "../../../../");
-const goldenDir = join(coreRoot, "tests/fixtures/golden/target-ts");
+const goldenDir = join(coreRoot, "tests/fixtures/golden/target-nextjs");
 const fixturesDir = join(coreRoot, "tests/fixtures/valid");
 
 // ---------------------------------------------------------------------------
@@ -67,7 +67,7 @@ function normalise(content: string): string {
 // ---------------------------------------------------------------------------
 // Map golden filename back to generated file path
 // Golden filename format: p0-domain-model--<path--with--double-dashes>
-// e.g. p0-domain-model--types--Proposal.ts → types/Proposal.ts
+// e.g. p0-domain-model--handlers--intake-proposals.ts → handlers/intake-proposals.ts
 // ---------------------------------------------------------------------------
 
 function goldenToPath(goldenName: string, prefix: string): string {
@@ -82,12 +82,13 @@ function goldenToPath(goldenName: string, prefix: string): string {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("target-ts golden conformance: p0-domain-model", () => {
+describe("target-nextjs golden conformance: p0-domain-model", () => {
   const source = readFileSync(join(fixturesDir, "p0-domain-model.strux"), "utf-8");
   const parseResult = parse(source);
   const ast = promote(parseResult.ast);
-  const generated = generate(ast, {}, { target: "typescript" });
-  const generatedMap = new Map(generated.map(f => [f.path, f.content]));
+  const { files, pkg } = build(ast, {}, { framework: "next" });
+  const allFiles = [...files, ...pkg.metadata, ...pkg.entrypoints];
+  const generatedMap = new Map(allFiles.map(f => [f.path, f.content]));
 
   const prefix = "p0-domain-model--";
   const goldenFiles = readdirSync(goldenDir)

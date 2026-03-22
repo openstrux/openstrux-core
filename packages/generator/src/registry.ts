@@ -1,7 +1,7 @@
 /**
- * Adapter registry — maps target names to Adapter implementations.
+ * Adapter registry — maps framework names to Adapter implementations.
  *
- * Spec reference: openstrux-spec/rfcs/RFC-0001-typescript-target-adapter.md §Adapter Registry
+ * Spec reference: openstrux-spec/specs/generator/generator.md §3
  */
 
 import type { Adapter } from "./types.js";
@@ -10,24 +10,24 @@ import { UnknownTargetError } from "./types.js";
 const registry: Map<string, Adapter> = new Map();
 
 /**
- * Register an adapter for a given target name.
- * If a target is already registered, it is replaced.
+ * Register an adapter for a given framework name (e.g. "nextjs").
+ * If a framework is already registered, it is replaced.
  */
-export function registerAdapter(target: string, adapter: Adapter): void {
-  registry.set(target, adapter);
+export function registerAdapter(framework: string, adapter: Adapter): void {
+  registry.set(framework, adapter);
 }
 
 /**
- * Retrieve the adapter for a given target name.
- * Throws `UnknownTargetError` if no adapter is registered for that target.
+ * Retrieve the adapter for a given framework name.
+ * Throws `UnknownTargetError` if no adapter is registered for that framework.
  */
-export function getAdapter(target: string): Adapter {
-  const adapter = registry.get(target);
-  if (adapter === undefined) throw new UnknownTargetError(target);
+export function getAdapter(framework: string): Adapter {
+  const adapter = registry.get(framework);
+  if (adapter === undefined) throw new UnknownTargetError(framework);
   return adapter;
 }
 
-/** Returns all registered target names. */
+/** Returns all registered framework names. */
 export function listTargets(): string[] {
   return Array.from(registry.keys());
 }

@@ -4,13 +4,17 @@ import { UnknownTargetError } from "../types.js";
 import type { Adapter, GeneratedFile } from "../types.js";
 
 const stubAdapter: Adapter = {
-  generate: () => [],
+  name: "stub",
+  emit: () => [],
+  package: () => ({ outputDir: ".openstrux/build", metadata: [], entrypoints: [] }),
 };
 
 const anotherAdapter: Adapter = {
-  generate: (): GeneratedFile[] => [
+  name: "another",
+  emit: (): GeneratedFile[] => [
     { path: "test.ts", content: "export {};", lang: "typescript" },
   ],
+  package: () => ({ outputDir: ".openstrux/build", metadata: [], entrypoints: [] }),
 };
 
 describe("adapter registry", () => {

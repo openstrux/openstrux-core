@@ -27,6 +27,25 @@ importers:
         specifier: ^2.0.0
         version: 2.1.9(@types/node@25.5.0)
 
+  packages/cli:
+    dependencies:
+      '@openstrux/generator':
+        specifier: workspace:*
+        version: link:../generator
+      '@openstrux/parser':
+        specifier: workspace:*
+        version: link:../parser
+      '@openstrux/validator':
+        specifier: workspace:*
+        version: link:../validator
+    devDependencies:
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@25.5.0)
+
   packages/config:
     dependencies:
       '@openstrux/ast':

@@ -1,0 +1,31 @@
+{
+  "name": "@openstrux/cli",
+  "version": "0.0.0",
+  "description": "OpenStrux CLI — strux build, init, doctor",
+  "type": "module",
+  "bin": {
+    "strux": "./dist/bin.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --passWithNoTests",
+    "check": "tsc --noEmit"
+  },
+  "files": ["dist", "src"],
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@openstrux/generator": "workspace:*",
+    "@openstrux/parser": "workspace:*",
+    "@openstrux/validator": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}

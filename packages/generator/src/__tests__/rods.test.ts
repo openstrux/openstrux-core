@@ -20,7 +20,8 @@ import type { SplitRoutesExpr } from "@openstrux/ast";
 const __filename = fileURLToPath(import.meta.url);
 const __dirnameLocal = dirname(__filename);
 const coreRoot = resolve(__dirnameLocal, "../../../../");
-const goldenRodsDir = join(coreRoot, "tests/fixtures/golden/target-ts/rods");
+// Rod golden fixtures live directly in target-nextjs/ (no rods/ subdir)
+const goldenRodsDir = join(coreRoot, "tests/fixtures/golden/target-nextjs");
 
 // ---------------------------------------------------------------------------
 // AST helpers — build minimal synthetic panels
@@ -57,7 +58,7 @@ function makePanel(name: string, rods: Rod[], fieldMask?: string[]): Panel {
 
 function runGenerate(panel: Panel): Map<string, string> {
   const ast: TopLevelNode[] = [panel];
-  const files = generate(ast, {}, { target: "typescript" });
+  const files = generate(ast, {}, { framework: "next" });
   return new Map(files.map(f => [f.path, f.content]));
 }
 
@@ -99,7 +100,7 @@ function normalise(content: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Task 6.3 — all 18 rod types: no crash, valid output
+// All 18 rod types: no crash, valid output
 // ---------------------------------------------------------------------------
 
 const ALL_18_RODS: Rod[] = [
@@ -133,14 +134,14 @@ describe("all 18 rod types: no crash", () => {
     }).not.toThrow();
   });
 
-  it("produces a route.ts file", () => {
+  it("produces a handlers/all-rods.ts file", () => {
     files = runGenerate(panel);
-    expect(files.has("app/api/all-rods/route.ts")).toBe(true);
+    expect(files.has("handlers/all-rods.ts")).toBe(true);
   });
 
-  it("route.ts is a non-empty string", () => {
+  it("handlers/all-rods.ts is a non-empty string", () => {
     files = runGenerate(panel);
-    const content = files.get("app/api/all-rods/route.ts") ?? "";
+    const content = files.get("handlers/all-rods.ts") ?? "";
     expect(content.length).toBeGreaterThan(0);
   });
 
@@ -165,14 +166,14 @@ describe("Tier 2 stubs: STRUX-STUB in output", () => {
       const rod: Rod = { kind: "Rod", name: `${rodType}-op`, rodType, cfg: {}, arg: {} };
       const panel = makePanel(`stub-${rodType}`, [makeReceiveRod(), rod]);
       const files = runGenerate(panel);
-      const route = files.get(`app/api/stub-${rodType}/route.ts`) ?? "";
-      expect(route).toContain("STRUX-STUB");
+      const handler = files.get(`handlers/stub-${rodType}.ts`) ?? "";
+      expect(handler).toContain("STRUX-STUB");
     });
   }
 });
 
 // ---------------------------------------------------------------------------
-// Task 6.4 — generator summary flags panels with Tier 2 stubs
+// Generator summary: Tier 2 stub panels flagged
 // ---------------------------------------------------------------------------
 
 describe("generator summary: Tier 2 stub panels flagged", () => {
@@ -212,35 +213,37 @@ describe("Tier 1 emitters: spec scenario requirements", () => {
     };
     const panel = makePanel("test-transform", [makeReceiveRod(), rod]);
     const files = runGenerate(panel);
-    const route = files.get("app/api/test-transform/route.ts") ?? "";
-    expect(route).toContain("function transform(input: Proposal): EligibilityRecord {");
+    const handler = files.get("handlers/test-transform.ts") ?? "";
+    expect(handler).toContain("function transformEval(input: Proposal): EligibilityRecord {");
   });
 
   it("transform: falls back to unknown for unresolved types", () => {
     const rod: Rod = { kind: "Rod", name: "eval", rodType: "transform", cfg: {}, arg: {} };
     const panel = makePanel("test-transform-unk", [makeReceiveRod(), rod]);
     const files = runGenerate(panel);
-    const route = files.get("app/api/test-transform-unk/route.ts") ?? "";
-    expect(route).toContain("function transform(input: unknown): unknown {");
+    const handler = files.get("handlers/test-transform-unk.ts") ?? "";
+    expect(handler).toContain("function transformEval(input: unknown): unknown {");
   });
 
-  it("filter: output contains input.filter inline expression", () => {
+  it("filter: output contains .filter inline expression", () => {
     const rod: Rod = { kind: "Rod", name: "my-filter", rodType: "filter", cfg: {}, arg: {} };
     const panel = makePanel("test-filter", [makeReceiveRod(), rod]);
     const files = runGenerate(panel);
-    const route = files.get("app/api/test-filter/route.ts") ?? "";
-    expect(route).toContain("input.filter((item) =>");
+    const handler = files.get("handlers/test-filter.ts") ?? "";
+    expect(handler).toContain(".filter((item) =>");
   });
 
-  it("write-data: output contains prisma create stub", () => {
+  it("write-data: output contains prisma create call", () => {
     const rod: Rod = { kind: "Rod", name: "store-op", rodType: "write-data", cfg: {}, arg: {} };
     const panel = makePanel("test-write", [makeReceiveRod("POST"), rod]);
     const files = runGenerate(panel);
-    const route = files.get("app/api/test-write/route.ts") ?? "";
-    expect(route).toContain("prisma.<model>.create({ data: input })");
+    const handler = files.get("handlers/test-write.ts") ?? "";
+    expect(handler).toContain("prisma.");
+    // receive → write-data: inputVar is "body" (no validate step to rename it)
+    expect(handler).toContain(".create({ data: body })");
   });
 
-  it("call: output contains fetch() stub with endpoint and method", () => {
+  it("call: output contains fetch() call with endpoint and method", () => {
     const rod: Rod = {
       kind: "Rod", name: "ext-call", rodType: "call",
       cfg: {
@@ -251,8 +254,8 @@ describe("Tier 1 emitters: spec scenario requirements", () => {
     };
     const panel = makePanel("test-call", [makeReceiveRod(), rod]);
     const files = runGenerate(panel);
-    const route = files.get("app/api/test-call/route.ts") ?? "";
-    expect(route).toContain('fetch("https://api.example.com/data", { method: "POST" })');
+    const handler = files.get("handlers/test-call.ts") ?? "";
+    expect(handler).toContain('fetch("https://api.example.com/data", { method: "POST" })');
   });
 
   it("split: switch block contains one case per named route", () => {
@@ -270,36 +273,38 @@ describe("Tier 1 emitters: spec scenario requirements", () => {
     };
     const panel = makePanel("test-split", [makeReceiveRod(), rod]);
     const files = runGenerate(panel);
-    const route = files.get("app/api/test-split/route.ts") ?? "";
-    expect(route).toContain('case "eligible":');
-    expect(route).toContain('case "ineligible":');
+    const handler = files.get("handlers/test-split.ts") ?? "";
+    expect(handler).toContain('case "eligible":');
+    expect(handler).toContain('case "ineligible":');
   });
 
   it("pseudonymize: JSDoc cites scope fieldMask fields", () => {
     const rod: Rod = { kind: "Rod", name: "anon-op", rodType: "pseudonymize", cfg: {}, arg: {} };
     const panel = makePanel("test-pseudo", [makeReceiveRod(), rod], ["email", "name"]);
     const files = runGenerate(panel);
-    const route = files.get("app/api/test-pseudo/route.ts") ?? "";
-    expect(route).toContain("@access scope.fieldMask: email, name");
+    const handler = files.get("handlers/test-pseudo.ts") ?? "";
+    expect(handler).toContain("@access scope.fieldMask: email, name");
   });
 
   it("encrypt: JSDoc cites scope fieldMask fields", () => {
     const rod: Rod = { kind: "Rod", name: "enc-op", rodType: "encrypt", cfg: {}, arg: {} };
     const panel = makePanel("test-encrypt", [makeReceiveRod(), rod], ["ssn", "dob"]);
     const files = runGenerate(panel);
-    const route = files.get("app/api/test-encrypt/route.ts") ?? "";
-    expect(route).toContain("@access scope.fieldMask: ssn, dob");
+    const handler = files.get("handlers/test-encrypt.ts") ?? "";
+    expect(handler).toContain("@access scope.fieldMask: ssn, dob");
   });
 });
 
 // ---------------------------------------------------------------------------
 // Golden fixture conformance — Tier 1 emitters
+// Golden files for rods are named: rod-<type>--handlers--<panel>.ts
+// They map to: handlers/<panel>.ts in generated output
 // ---------------------------------------------------------------------------
 
 describe("rod golden fixtures", () => {
   if (!existsSync(goldenRodsDir)) return;
   const goldenFiles = readdirSync(goldenRodsDir)
-    .filter(f => f.endsWith(".ts"))
+    .filter(f => f.startsWith("rod-") && f.endsWith(".ts"))
     .sort();
 
   if (goldenFiles.length === 0) return;
@@ -318,7 +323,7 @@ describe("rod golden fixtures", () => {
     };
     const panel = makePanel("test-transform", [makeReceiveRod(), rod]);
     const files = runGenerate(panel);
-    const actual = files.get("app/api/test-transform/route.ts") ?? "";
+    const actual = files.get("handlers/test-transform.ts") ?? "";
     expect(normalise(actual)).toEqual(normalise(goldenContent));
   });
 
@@ -329,7 +334,7 @@ describe("rod golden fixtures", () => {
     const rod: Rod = { kind: "Rod", name: "my-filter", rodType: "filter", cfg: {}, arg: {} };
     const panel = makePanel("test-filter", [makeReceiveRod(), rod]);
     const files = runGenerate(panel);
-    const actual = files.get("app/api/test-filter/route.ts") ?? "";
+    const actual = files.get("handlers/test-filter.ts") ?? "";
     expect(normalise(actual)).toEqual(normalise(goldenContent));
   });
 
@@ -340,7 +345,7 @@ describe("rod golden fixtures", () => {
     const rod: Rod = { kind: "Rod", name: "store-op", rodType: "write-data", cfg: {}, arg: {} };
     const panel = makePanel("test-write-data", [makeReceiveRod("POST"), rod]);
     const files = runGenerate(panel);
-    const actual = files.get("app/api/test-write-data/route.ts") ?? "";
+    const actual = files.get("handlers/test-write-data.ts") ?? "";
     expect(normalise(actual)).toEqual(normalise(goldenContent));
   });
 
@@ -358,7 +363,7 @@ describe("rod golden fixtures", () => {
     };
     const panel = makePanel("test-call", [makeReceiveRod(), rod]);
     const files = runGenerate(panel);
-    const actual = files.get("app/api/test-call/route.ts") ?? "";
+    const actual = files.get("handlers/test-call.ts") ?? "";
     expect(normalise(actual)).toEqual(normalise(goldenContent));
   });
 
@@ -380,7 +385,7 @@ describe("rod golden fixtures", () => {
     };
     const panel = makePanel("test-split", [makeReceiveRod(), rod]);
     const files = runGenerate(panel);
-    const actual = files.get("app/api/test-split/route.ts") ?? "";
+    const actual = files.get("handlers/test-split.ts") ?? "";
     expect(normalise(actual)).toEqual(normalise(goldenContent));
   });
 
@@ -391,7 +396,7 @@ describe("rod golden fixtures", () => {
     const rod: Rod = { kind: "Rod", name: "anon-op", rodType: "pseudonymize", cfg: {}, arg: {} };
     const panel = makePanel("test-pseudo", [makeReceiveRod(), rod], ["email", "name"]);
     const files = runGenerate(panel);
-    const actual = files.get("app/api/test-pseudo/route.ts") ?? "";
+    const actual = files.get("handlers/test-pseudo.ts") ?? "";
     expect(normalise(actual)).toEqual(normalise(goldenContent));
   });
 
@@ -402,7 +407,7 @@ describe("rod golden fixtures", () => {
     const rod: Rod = { kind: "Rod", name: "enc-op", rodType: "encrypt", cfg: {}, arg: {} };
     const panel = makePanel("test-encrypt", [makeReceiveRod(), rod], ["ssn", "dob"]);
     const files = runGenerate(panel);
-    const actual = files.get("app/api/test-encrypt/route.ts") ?? "";
+    const actual = files.get("handlers/test-encrypt.ts") ?? "";
     expect(normalise(actual)).toEqual(normalise(goldenContent));
   });
 });
