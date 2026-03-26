@@ -14,6 +14,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "bundle": "esbuild src/bin.ts --bundle --platform=node --format=esm --outfile=dist/strux-standalone.mjs",
     "test": "vitest run --passWithNoTests",
     "check": "tsc --noEmit"
   },
