@@ -32,6 +32,12 @@ function promoteTypeExpr(pt: ParseTypeExpr): TypeExpr {
   if (pt.kind === "named") {
     return { kind: "TypeRef", name: pt.name } as TypeExpr;
   }
+  if (pt.kind === "constrained-string") {
+    return { kind: "ConstrainedStringType", values: pt.values } as TypeExpr;
+  }
+  if (pt.kind === "constrained-number") {
+    return { kind: "ConstrainedNumberType", min: pt.min, max: pt.max } as TypeExpr;
+  }
   // container
   return {
     kind: "ContainerType",

@@ -53,7 +53,9 @@ export type StruxNode = RecordNode | EnumNode | UnionNode | PanelNode;
 export type ParseTypeExpr =
   | { kind: "primitive"; name: string }
   | { kind: "named"; name: string }
-  | { kind: "container"; container: string; args: ParseTypeExpr[] };
+  | { kind: "container"; container: string; args: ParseTypeExpr[] }
+  | { kind: "constrained-string"; values: string[] }
+  | { kind: "constrained-number"; min: number; max: number };
 
 /** Primitive type names built into the language. */
 export const PRIMITIVE_TYPES = new Set([

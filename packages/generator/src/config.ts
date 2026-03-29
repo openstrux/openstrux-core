@@ -35,6 +35,8 @@ export interface ParsedConfig {
   orm:        ConfigEntry;
   validation: ConfigEntry;
   runtime:    ConfigEntry;
+  /** Source glob patterns from the `source:` section. Empty if not specified. */
+  source:     string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -66,30 +68,35 @@ function parseEntry(raw: string, field: string): ConfigEntry {
  */
 export function parseConfig(yaml: string): ParsedConfig {
   const lines = yaml.split("\n");
-  let inTarget = false;
+  let section: "none" | "target" | "source" | "output" = "none";
   const raw: Record<string, string> = {};
+  const sourceGlobs: string[] = [];
 
   for (const line of lines) {
     const trimmed = line.trim();
     if (trimmed === "" || trimmed.startsWith("#")) continue;
 
-    if (trimmed === "target:") {
-      inTarget = true;
+    // Top-level section headers
+    if (!line.startsWith(" ") && !line.startsWith("\t")) {
+      if (trimmed === "target:") { section = "target"; continue; }
+      if (trimmed === "source:") { section = "source"; continue; }
+      if (trimmed === "output:") { section = "output"; continue; }
+      section = "none";
       continue;
     }
 
-    // New top-level key (not indented) exits target section
-    if (!line.startsWith(" ") && !line.startsWith("\t") && trimmed.endsWith(":")) {
-      inTarget = false;
-      continue;
-    }
-
-    if (inTarget) {
+    if (section === "target") {
       const colonIdx = trimmed.indexOf(":");
       if (colonIdx === -1) continue;
       const key = trimmed.slice(0, colonIdx).trim();
       const value = trimmed.slice(colonIdx + 1).trim();
       raw[key] = value;
+    }
+
+    if (section === "source") {
+      // YAML list item: `  - "glob/pattern"`
+      const listMatch = trimmed.match(/^-\s+"(.+)"$/) ?? trimmed.match(/^-\s+'(.+)'$/) ?? trimmed.match(/^-\s+(.+)$/);
+      if (listMatch) sourceGlobs.push(listMatch[1]!.trim());
     }
   }
 
@@ -106,6 +113,7 @@ export function parseConfig(yaml: string): ParsedConfig {
     orm:        parseEntry(raw["orm"]!,         "orm"),
     validation: parseEntry(raw["validation"]!,  "validation"),
     runtime:    parseEntry(raw["runtime"]!,     "runtime"),
+    source:     sourceGlobs,
   };
 }
 

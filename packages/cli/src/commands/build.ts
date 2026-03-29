@@ -8,7 +8,7 @@
  */
 
 import { readFileSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
-import { join, resolve, dirname } from "node:path";
+import { join, resolve, dirname, relative, matchesGlob } from "node:path";
 import { parse } from "@openstrux/parser";
 import {
   loadConfig,
@@ -44,10 +44,11 @@ export async function runBuild(projectRoot: string = process.cwd()): Promise<voi
     throw e;
   }
 
-  // 3. Parse all .strux files
-  const struxFiles = findStruxFiles(projectRoot);
+  // 3. Parse all .strux files matched by config source globs
+  const sourceGlobs: string[] = Array.isArray(config.source) ? config.source : [];
+  const struxFiles = findStruxFiles(projectRoot, sourceGlobs);
   if (struxFiles.length === 0) {
-    console.warn("strux: no .strux files found in project. Nothing to build.");
+    console.warn("strux: no .strux files matched source globs in strux.config.yaml. Nothing to build.");
     return;
   }
 
@@ -56,9 +57,10 @@ export async function runBuild(projectRoot: string = process.cwd()): Promise<voi
     const source = readFileSync(filePath, "utf-8");
     const result = parse(source);
     if (result.diagnostics && result.diagnostics.length > 0) {
-      console.error(`strux: parse error in ${filePath}:`);
+      const rel = relative(projectRoot, filePath);
+      console.error(`strux: parse error in ${rel}:`);
       for (const err of result.diagnostics) {
-        console.error(`  ${String(err)}`);
+        console.error(`  ${err.severity.toUpperCase()} ${err.code} [${err.line}:${err.col}] ${err.message}`);
       }
       process.exit(1);
     }
@@ -83,7 +85,7 @@ export async function runBuild(projectRoot: string = process.cwd()): Promise<voi
   );
 }
 
-function findStruxFiles(root: string): string[] {
+function findStruxFiles(root: string, sourceGlobs: string[]): string[] {
   const results: string[] = [];
   const IGNORE = new Set(["node_modules", ".git", ".openstrux", "dist"]);
 
@@ -100,7 +102,11 @@ function findStruxFiles(root: string): string[] {
       if (entry.isDirectory()) {
         walk(full);
       } else if (entry.isFile() && entry.name.endsWith(".strux")) {
-        results.push(full);
+        const rel = relative(root, full);
+        // If source globs are configured, only include files that match at least one
+        if (sourceGlobs.length === 0 || sourceGlobs.some((g) => matchesGlob(rel, g))) {
+          results.push(full);
+        }
       }
     }
   }

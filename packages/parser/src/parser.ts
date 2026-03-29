@@ -357,6 +357,62 @@ export class Parser {
       return { kind: "container", container: name, args };
     }
 
+    // Constraint syntax: `string ["a", "b"]` or `number [0..100]`
+    if (this.peek().type === TokenType.LBRACKET) {
+      if (name === "string") {
+        this.consume(); // consume [
+        const values: string[] = [];
+        while (this.peek().type !== TokenType.RBRACKET && this.peek().type !== TokenType.EOF) {
+          const vTok = this.peek();
+          if (vTok.type !== TokenType.STRING) {
+            this.addError("E000", `Expected string literal in string constraint, got ${JSON.stringify(vTok.value)}`, vTok);
+            this.recover();
+            break;
+          }
+          this.consume();
+          values.push(vTok.value as string);
+          if (this.peek().type === TokenType.COMMA) this.consume();
+        }
+        this.expect(TokenType.RBRACKET, "closing ']' of string constraint");
+        return { kind: "constrained-string", values };
+      }
+      if (name === "number") {
+        this.consume(); // consume [
+        const minTok = this.peek();
+        if (minTok.type !== TokenType.NUMBER) {
+          this.addError("E000", `Expected number in numeric range constraint, got ${JSON.stringify(minTok.value)}`, minTok);
+          this.recover();
+          return { kind: "primitive", name: "number" };
+        }
+        this.consume();
+        const min = Number(minTok.value);
+        // expect ".."
+        const dot1 = this.peek();
+        if (dot1.type !== TokenType.IDENT || dot1.value !== "..") {
+          // Try consuming two dots
+          if (this.peek().type === TokenType.IDENT && (this.peek().value as string).startsWith("..")) {
+            this.consume();
+          } else {
+            this.addError("E000", `Expected '..' in numeric range constraint`, dot1);
+            this.recover();
+            return { kind: "primitive", name: "number" };
+          }
+        } else {
+          this.consume();
+        }
+        const maxTok = this.peek();
+        if (maxTok.type !== TokenType.NUMBER) {
+          this.addError("E000", `Expected number after '..' in numeric range constraint, got ${JSON.stringify(maxTok.value)}`, maxTok);
+          this.recover();
+          return { kind: "primitive", name: "number" };
+        }
+        this.consume();
+        const max = Number(maxTok.value);
+        this.expect(TokenType.RBRACKET, "closing ']' of numeric range constraint");
+        return { kind: "constrained-number", min, max };
+      }
+    }
+
     if (PRIMITIVE_TYPES.has(name)) {
       return { kind: "primitive", name };
     }
