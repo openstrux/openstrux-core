@@ -20,7 +20,7 @@ export { registerAdapter, getAdapter, listTargets } from "./registry.js";
 export { generate, build } from "./generate.js";
 export { promote } from "./promote.js";
 export { parseConfig, loadConfig, ConfigParseError } from "./config.js";
-export { resolveOptions, AdapterResolutionError, BUNDLED_MANIFESTS } from "./resolve.js";
+export { resolveOptions, AdapterResolutionError, BUNDLED_MANIFESTS, STRUX_VERSION } from "./resolve.js";
 
 // Register built-in adapters
 import { NextJsAdapter } from "./adapters/nextjs/index.js";

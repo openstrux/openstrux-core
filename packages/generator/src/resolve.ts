@@ -27,13 +27,19 @@ export interface AdapterManifest {
 }
 
 // ---------------------------------------------------------------------------
+// Strux version — keep in sync with ../../VERSION; update by running pnpm bundle
+// ---------------------------------------------------------------------------
+
+export const STRUX_VERSION = "0.6.0";
+
+// ---------------------------------------------------------------------------
 // Bundled adapter manifests (v0.6 — only nextjs)
 // ---------------------------------------------------------------------------
 
 export const BUNDLED_MANIFESTS: AdapterManifest[] = [
   {
     name: "adapter/nextjs",
-    version: "1.0.0",
+    version: STRUX_VERSION,
     supports: {
       framework:  "next@>=13.0 <17.0",
       base:       "typescript@>=5.0",
