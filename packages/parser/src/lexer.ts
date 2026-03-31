@@ -232,7 +232,8 @@ export function tokenize(source: string): Token[] {
         emit(TokenType.DURATION, num, startLine, startCol, startPos);
         continue;
       }
-      if (s.pos < source.length && charAt(source, s.pos) === ".") {
+      // Only consume '.' as decimal point if not followed by another '.' (range separator '..')
+      if (s.pos < source.length && charAt(source, s.pos) === "." && charAt(source, s.pos + 1) !== ".") {
         num += ".";
         s.pos++;
         s.col++;
@@ -289,7 +290,16 @@ export function tokenize(source: string): Token[] {
       case "]": emit(TokenType.RBRACKET, ch, startLine, startCol, startPos); break;
       case ":": emit(TokenType.COLON,    ch, startLine, startCol, startPos); break;
       case ",": emit(TokenType.COMMA,    ch, startLine, startCol, startPos); break;
-      case ".": emit(TokenType.DOT,      ch, startLine, startCol, startPos); break;
+      case ".":
+        // Emit '..' as a single IDENT token (used in numeric range constraints)
+        if (charAt(source, s.pos) === ".") {
+          s.pos++;
+          s.col++;
+          emit(TokenType.IDENT, "..", startLine, startCol, startPos);
+        } else {
+          emit(TokenType.DOT, ch, startLine, startCol, startPos);
+        }
+        break;
       case "=": emit(TokenType.EQUALS,   ch, startLine, startCol, startPos); break;
       case "*": emit(TokenType.STAR,     ch, startLine, startCol, startPos); break;
       default:  emit(TokenType.UNKNOWN,  ch, startLine, startCol, startPos); break;

@@ -8,16 +8,26 @@
  *   strux doctor  — check config, adapters, and tsconfig paths
  */
 
+import { readFileSync } from "fs";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 import { runBuild } from "./commands/build.js";
 import { runInit } from "./commands/init.js";
 import { runDoctor } from "./commands/doctor.js";
 
 // Injected at bundle time by bundle.mjs via esbuild --define:__STRUX_VERSION__
-// Falls back to package version for non-bundled (tsc) builds.
+// Falls back to the root VERSION file for non-bundled (tsc) builds.
 declare const __STRUX_VERSION__: string;
 const STRUX_VERSION: string = (typeof __STRUX_VERSION__ !== "undefined")
   ? __STRUX_VERSION__
-  : "0.0.0-dev";
+  : (() => {
+      try {
+        const versionFile = join(dirname(fileURLToPath(import.meta.url)), "../../../VERSION");
+        return readFileSync(versionFile, "utf8").trim();
+      } catch {
+        return "0.0.0-dev";
+      }
+    })();
 
 const [, , command, ...args] = process.argv;
 

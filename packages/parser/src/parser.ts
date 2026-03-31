@@ -156,7 +156,7 @@ export class Parser {
       } else if (tok.type === TokenType.AT_CONTEXT) {
         // @context blocks — skip the whole block for v0.6.0
         this.consume(); // consume @context
-        this.consume(); // consume name
+        // @context has no name — block opens directly with {
         if (this.peek().type === TokenType.LBRACE) {
           this.skipBlock();
         }
@@ -779,15 +779,24 @@ export class Parser {
     }
 
     let braceDepth = 0;
+    let parenDepth = 0;
+    let bracketDepth = 0;
     while (true) {
       const t = this.peek();
       if (t.type === TokenType.EOF) break;
       if (t.type === TokenType.NEWLINE) break;
-      if (t.type === TokenType.COMMA && braceDepth === 0) break;
+      if (t.type === TokenType.COMMA && braceDepth === 0 && parenDepth === 0 && bracketDepth === 0) break;
       if (t.type === TokenType.RBRACE && braceDepth === 0) break;
 
       if (t.type === TokenType.LBRACE) braceDepth++;
       else if (t.type === TokenType.RBRACE) braceDepth--;
+      else if (t.type === TokenType.LPAREN) parenDepth++;
+      else if (t.type === TokenType.RPAREN) parenDepth--;
+      else if (t.type === TokenType.LBRACKET) bracketDepth++;
+      else if (t.type === TokenType.RBRACKET) {
+        if (bracketDepth === 0) break; // closing bracket belongs to outer context
+        bracketDepth--;
+      }
 
       this.consume();
       exprEnd = t.offset + t.length;
