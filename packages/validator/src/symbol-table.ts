@@ -14,8 +14,50 @@ export interface TypeEntry {
   readonly col?: number | undefined;
 }
 
+// ---------------------------------------------------------------------------
+// Built-in standard type entries (spec: specs/modules/types/standard/personal-data/)
+// Pre-populated so panel authors can reference them without re-declaring.
+// ---------------------------------------------------------------------------
+
+const BUILTIN_TYPES: TypeEntry[] = [
+  // Privacy framework types
+  { name: "PrivacyFramework",    kind: "union",  fields: ["gdpr", "ccpa", "lgpd"] },
+  { name: "GdprFramework",       kind: "union",  fields: ["base", "bdsg", "lopdgdd"] },
+  { name: "GdprBaseConfig",      kind: "record", fields: ["lawful_basis", "data_subject_categories", "dpia_ref", "cross_border_transfer"] },
+  { name: "GdprBasis",           kind: "enum",   fields: ["consent", "contract", "legal_obligation", "vital_interests", "public_task", "legitimate_interest"] },
+  { name: "CrossBorderTransfer", kind: "record", fields: ["mechanism", "destination_countries"] },
+  { name: "TransferMechanism",   kind: "enum",   fields: ["adequacy_decision", "standard_contractual_clauses", "binding_corporate_rules", "explicit_consent"] },
+  { name: "BdsgConfig",          kind: "record", fields: ["lawful_basis", "data_subject_categories", "dpia_ref", "cross_border_transfer", "employee_data", "betriebsrat_consent", "employee_category"] },
+  { name: "EmployeeCategory",    kind: "enum",   fields: ["applicant", "employee", "former_employee", "contractor", "trainee"] },
+  // Field classification types
+  { name: "FieldClassification", kind: "record", fields: ["field", "category", "sensitivity"] },
+  { name: "DataCategory",        kind: "enum",   fields: ["identifying", "quasi_identifying", "sensitive_special", "financial", "health", "biometric", "genetic", "political", "religious", "trade_union", "sexual_orientation", "criminal"] },
+  { name: "Sensitivity",         kind: "enum",   fields: ["standard", "special_category", "highly_sensitive"] },
+  // Retention
+  { name: "RetentionPolicy",     kind: "record", fields: ["duration", "basis", "review_date"] },
+  { name: "RetentionBasis",      kind: "enum",   fields: ["legal_obligation", "contract", "consent", "legitimate_interest", "vital_interests", "public_task"] },
+  // PrivateData<T> wrapper
+  { name: "PrivateData",         kind: "record", fields: ["data", "classification", "processing"] },
+  { name: "ProcessingMetadata",  kind: "record", fields: ["purpose", "basis", "retention", "consent_ref"] },
+  { name: "PrivacyAuditRecord",  kind: "record", fields: ["rod_id", "framework", "purpose", "pseudonymized", "encrypted", "lawful_basis", "expansion_hash", "ts"] },
+  // Standard personal data models (spec: specs/modules/types/standard/personal-data/)
+  { name: "PersonName",          kind: "record", fields: ["given_name", "family_name", "middle_name", "prefix", "suffix"] },
+  { name: "PersonalContact",     kind: "record", fields: ["email", "phone", "mobile", "preferred_channel"] },
+  { name: "PostalAddress",       kind: "record", fields: ["street", "city", "state", "postal_code", "country"] },
+  { name: "UserIdentity",        kind: "record", fields: ["name", "contact", "date_of_birth", "national_id"] },
+  { name: "EmployeeRecord",      kind: "record", fields: ["identity", "employee_id", "department", "position", "hire_date", "salary", "manager_id"] },
+  { name: "FinancialAccount",    kind: "record", fields: ["iban", "bic", "account_holder", "bank_name"] },
+];
+
 export class SymbolTable {
   private readonly table: Map<string, TypeEntry> = new Map();
+
+  constructor() {
+    // Pre-populate with built-in standard types
+    for (const entry of BUILTIN_TYPES) {
+      this.table.set(entry.name, entry);
+    }
+  }
 
   /**
    * Populate the symbol table from a parse AST.

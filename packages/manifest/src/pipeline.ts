@@ -17,6 +17,7 @@ import type { SnapLock } from "@openstrux/lock";
 import { computeContentHash } from "./canonicalise.js";
 import { extractScope } from "./scope.js";
 import { generateAudit } from "./audit.js";
+import { emitPrivacyRecords } from "./privacy-records.js";
 import {
   type Manifest,
   type ManifestDiagnostic,
@@ -82,6 +83,7 @@ export function generateManifest(
   const contentHash = computeContentHash(input.source);
   const certificationScope = extractScope(input.sourceFile);
   const audit = generateAudit(input.sourceFile);
+  const privacyRecords = emitPrivacyRecords(input.sourceFile);
 
   const lockRef: string | null = input.lock?.sourceHash ?? null;
   const timestamp = new Date().toISOString();
@@ -94,6 +96,7 @@ export function generateManifest(
     timestamp,
     lockRef,
     audit,
+    ...(privacyRecords !== undefined ? { privacyRecords } : {}),
   };
 
   const diagnostics: ManifestDiagnostic[] = [

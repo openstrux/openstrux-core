@@ -33,12 +33,15 @@ import {
 // ---------------------------------------------------------------------------
 
 const KNOWN_ROD_TYPES = new Set<string>([
+  // Basic rods (18)
   "read-data", "write-data",
   "receive", "respond", "call",
   "transform", "filter", "group", "aggregate", "merge", "join", "window",
   "guard", "store",
   "validate", "pseudonymize", "encrypt",
   "split",
+  // Standard rods (spec: modules/rods/standard/)
+  "private-data",
 ]);
 
 // ---------------------------------------------------------------------------

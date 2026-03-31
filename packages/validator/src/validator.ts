@@ -16,6 +16,7 @@ import { checkTypeNames } from "./type-name-checker.js";
 import { validateOpsBlocks } from "./ops-schema.js";
 import { validateSchemaRefs } from "./schema-ref-validator.js";
 import { validateStreamConfigs } from "./stream-validator.js";
+import { validatePrivacy } from "./privacy-validator.js";
 
 export interface ValidateOptions extends CertValidationOptions {}
 
@@ -75,6 +76,9 @@ export function validate(
 
   // E_STREAM_MISSING_FIELD, E_STREAM_UNKNOWN_ADAPTER — stream target config validation
   diagnostics.push(...validateStreamConfigs(panels));
+
+  // E_GDPR_PURPOSE_REQUIRED, E_GDPR_RETENTION_REQUIRED, E_PRIVACY_BYPASS, etc.
+  diagnostics.push(...validatePrivacy(panels));
 
   return { diagnostics };
 }

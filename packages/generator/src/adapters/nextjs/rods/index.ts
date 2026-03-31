@@ -22,6 +22,7 @@ import { emitEncrypt }      from "./encrypt.js";
 import {
   emitGroup, emitAggregate, emitMerge, emitJoin, emitWindow, emitStore,
 } from "./tier2.js";
+import { emitPrivateData } from "./standard/private-data.js";
 
 export type { ChainStep, ChainContext, RodStepEmitter, ImportDecl } from "./types.js";
 export { getTransformHelper } from "./transform.js";
@@ -52,6 +53,9 @@ const ROD_STEP_EMITTERS: Record<string, RodStepEmitter> = {
   "pseudonymize": emitPseudonymize,
   "encrypt":      emitEncrypt,
   "store":        emitStore,
+  // Standard rods
+  "private-data": emitPrivateData,
+  // Tier 2 rods
   "group":        emitGroup,
   "aggregate":    emitAggregate,
   "merge":        emitMerge,

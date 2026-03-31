@@ -153,6 +153,52 @@ export type {
   Urgency,
 } from "./access.js";
 
+// Privacy constants
+export {
+  ENCRYPTION_FORCING_SENSITIVITIES,
+  EXPANSION_SUFFIX,
+  FRAMEWORK_PATH,
+  GDPR_BASIS,
+  MANIFEST_PRIVACY,
+  PRIVACY_DIAG,
+  PRIVACY_TYPE,
+  PRIVATE_DATA_KNOT,
+  PSEUDO_ALGO,
+  ROD_TYPE,
+  SENSITIVITY,
+  SPECIAL_CATEGORY_ALLOWED_BASES,
+  STANDARD_DATA_TYPE,
+} from "./privacy-constants.js";
+export type {
+  FrameworkPath,
+  GdprBasisValue,
+  PrivacyDiagCode,
+  PseudoAlgo,
+  RodTypeKey,
+  SensitivityValue,
+} from "./privacy-constants.js";
+
+// Privacy types (private-data standard rod)
+export type {
+  BdsgConfig,
+  CrossBorderTransfer,
+  DataCategory,
+  EmployeeCategory,
+  FieldClassification,
+  GdprBaseConfig,
+  GdprBasis,
+  PrivacyAuditRecord,
+  PrivacyFrameworkConfig,
+  PrivacyFrameworkPath,
+  PrivateDataWrapper,
+  ProcessingMetadata,
+  ResolvedPrivacyFramework,
+  RetentionBasis,
+  RetentionPolicy,
+  Sensitivity,
+  TransferMechanism,
+} from "./privacy.js";
+
 // Panel and Rod nodes
 export type {
   ArgValue,

@@ -25,6 +25,15 @@
  *   stream/write-data config (v0.6.0):
  *   E_STREAM_MISSING_FIELD   Required field missing in stream adapter config
  *   E_STREAM_UNKNOWN_ADAPTER Unrecognized stream adapter type
+ *
+ *   private-data / @privacy validation (v0.6.0):
+ *   E_GDPR_PURPOSE_REQUIRED            cfg.purpose missing on private-data rod (Art. 5(1)(b))
+ *   E_GDPR_RETENTION_REQUIRED          cfg.retention missing on private-data rod (Art. 5(1)(e))
+ *   E_GDPR_INVALID_BASIS_SPECIAL_CATEGORY  Invalid lawful basis for special category data (Art. 9)
+ *   W_GDPR_LI_DPIA_RECOMMENDED         legitimate_interest without dpia_ref (Art. 35)
+ *   E_PRIVACY_BYPASS                   @privacy panel has no private-data rod
+ *   E_PRIVATE_DATA_BYPASS              PrivateData<T> bypasses private-data rod
+ *   E_BDSG_EMPLOYEE_CATEGORY           employee_data:true without employee_category (BDSG §26)
  */
 export interface ValidationDiagnostic {
   readonly code: string;
@@ -55,4 +64,12 @@ export type DiagnosticCode =
   | "E_SCHEMA_STRING"
   | "E_SCHEMA_UNRESOLVED"
   | "E_STREAM_MISSING_FIELD"
-  | "E_STREAM_UNKNOWN_ADAPTER";
+  | "E_STREAM_UNKNOWN_ADAPTER"
+  // Privacy
+  | "E_GDPR_PURPOSE_REQUIRED"
+  | "E_GDPR_RETENTION_REQUIRED"
+  | "E_GDPR_INVALID_BASIS_SPECIAL_CATEGORY"
+  | "W_GDPR_LI_DPIA_RECOMMENDED"
+  | "E_PRIVACY_BYPASS"
+  | "E_PRIVATE_DATA_BYPASS"
+  | "E_BDSG_EMPLOYEE_CATEGORY";

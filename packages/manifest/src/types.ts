@@ -9,6 +9,47 @@
 // Core manifest shape (mf.strux.json)
 // ===================================================================
 
+// ===================================================================
+// Privacy records (privacyRecords — Art. 30 / BDSG §26 manifest entries)
+// Spec: openstrux-spec/specs/modules/manifest.md §Privacy Records
+// ===================================================================
+
+/** Art. 30 GDPR record of processing activities. */
+export interface Art30Record {
+  readonly controller: string;
+  readonly controllerId?: string | undefined;
+  readonly dpo?: string | undefined;
+  readonly dpRecord?: string | undefined;
+  readonly purpose: string;
+  readonly lawfulBasis: string;
+  readonly dataSubjectCategories: readonly string[];
+  readonly personalDataCategories: readonly string[];
+  readonly specialCategories: readonly string[];
+  readonly recipients: readonly string[];
+  readonly retention: string;
+  readonly technicalMeasures: readonly string[];
+  readonly dpiaRef?: string | null | undefined;
+  readonly crossBorderTransfer?: {
+    readonly mechanism: string;
+    readonly destinationCountries: readonly string[];
+  } | null | undefined;
+}
+
+/** BDSG §26 extension on top of Art. 30. */
+export interface BdsgExtension {
+  readonly bdsgSection26: boolean;
+  readonly employeeCategory?: string | undefined;
+  readonly betriebsratConsent?: string | undefined;
+}
+
+/** One privacy record per private-data rod instance in the panel. */
+export interface PrivacyRecord {
+  readonly rodName: string;
+  readonly framework: string;
+  readonly article30: Art30Record;
+  readonly bdsg?: BdsgExtension | undefined;
+}
+
 /** Top-level compiled manifest artifact. */
 export interface Manifest {
   /** Schema version of this manifest format. Always "0.6" for this release. */
@@ -34,6 +75,12 @@ export interface Manifest {
   readonly lockRef: string | null;
   /** Structured audit / explanation data (ADR-013). */
   readonly audit: ManifestAudit;
+  /**
+   * Art. 30 / BDSG §26 privacy records — one entry per private-data rod instance.
+   * Present only when at least one panel contains a private-data rod.
+   * Spec: openstrux-spec/specs/modules/manifest.md §Privacy Records
+   */
+  readonly privacyRecords?: readonly PrivacyRecord[] | undefined;
 }
 
 // ===================================================================

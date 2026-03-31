@@ -187,6 +187,16 @@ export const ROD_SIGNATURES: ReadonlyMap<string, RodSignature> = new Map([
       category: "topology",
     },
   ],
+  // Standard rods (spec: modules/rods/standard/)
+  [
+    "private-data",
+    {
+      rodType: "private-data",
+      inKind: "Stream",
+      outKind: "Stream",
+      category: "standard-privacy",
+    },
+  ],
 ]);
 
 export function getRodSignature(rodType: string): RodSignature | undefined {
