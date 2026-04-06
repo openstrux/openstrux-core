@@ -1,5 +1,6 @@
 import type { Rod } from "@openstrux/ast";
 import type { ChainContext, ChainStep } from "./types.js";
+import { getCfgTypeName } from "./config-extractors.js";
 
 export function emitTransform(rod: Rod, ctx: ChainContext): ChainStep {
   const inType  = getCfgTypeName(rod, "in")  ?? ctx.inputType;
@@ -27,14 +28,6 @@ function buildHelperFn(fnName: string, inType: string, outType: string, rodName:
     `  throw new Error("not implemented");`,
     `}`,
   ].join("\n");
-}
-
-function getCfgTypeName(rod: Rod, key: string): string | undefined {
-  const val = rod.cfg[key] as unknown as Record<string, unknown> | undefined;
-  if (val === undefined) return undefined;
-  if (val["kind"] === "TypeRef" && typeof val["name"] === "string") return val["name"] as string;
-  if (typeof val["resolvedType"] === "string") return val["resolvedType"] as string;
-  return undefined;
 }
 
 function toPascal(name: string): string {

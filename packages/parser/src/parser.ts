@@ -446,6 +446,7 @@ export class Parser {
 
     let dp: Record<string, KnotValue> | undefined;
     let access: PanelAccessNode | undefined;
+    let privacy: Record<string, KnotValue> | undefined;
     const rods: RodNode[] = [];
 
     this.skipNewlines();
@@ -464,6 +465,14 @@ export class Parser {
       if (tok.type === TokenType.AT_ACCESS) {
         this.consume(); // @access
         access = this.parseAccessBlock();
+        this.skipNewlines();
+        continue;
+      }
+
+      // @privacy decorator — declares governing privacy framework
+      if (tok.type === TokenType.AT_UNKNOWN && tok.value === "@privacy") {
+        this.consume(); // @privacy
+        privacy = this.parseKnotBlock();
         this.skipNewlines();
         continue;
       }
@@ -503,7 +512,7 @@ export class Parser {
       );
     }
 
-    return { kind: "panel", name, dp, access, rods, loc: this.loc(atTok) };
+    return { kind: "panel", name, dp, access, privacy: privacy || undefined, rods, loc: this.loc(atTok) };
   }
 
   /** Parse `{ key: value, ... }` knot block (for @dp, rod bodies, nested configs). */

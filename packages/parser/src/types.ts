@@ -152,6 +152,8 @@ export interface PanelNode {
   readonly name: string;
   readonly dp?: Record<string, KnotValue> | undefined;
   readonly access?: PanelAccessNode | undefined;
+  /** `@privacy { framework: gdpr, dpa_ref?: "..." }` — declares the governing privacy framework. */
+  readonly privacy?: Record<string, KnotValue> | undefined;
   readonly rods: RodNode[];
   readonly loc?: NodeLoc | undefined;
 }

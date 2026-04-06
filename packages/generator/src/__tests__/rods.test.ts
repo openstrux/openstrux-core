@@ -155,43 +155,155 @@ describe("all 18 rod types: no crash", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Tier 2 stubs — STRUX-STUB present in output
+// Tier 2 emitters — now fully implemented
 // ---------------------------------------------------------------------------
 
-describe("Tier 2 stubs: STRUX-STUB in output", () => {
-  const tier2Types = ["group", "aggregate", "merge", "join", "window"] as const;
+describe("Tier 2 emitters: functional output", () => {
+  it("group: output contains reduce-based grouping", () => {
+    const rod: Rod = { kind: "Rod", name: "group-op", rodType: "group", cfg: {}, arg: {} };
+    const panel = makePanel("test-group", [makeReceiveRod(), rod]);
+    const files = runGenerate(panel);
+    const handler = files.get("handlers/test-group.ts") ?? "";
+    expect(handler).toContain("grouped");
+    expect(handler).toContain(".reduce");
+    expect(handler).not.toContain("STRUX-STUB");
+  });
 
-  for (const rodType of tier2Types) {
-    it(`${rodType} rod emits STRUX-STUB`, () => {
-      const rod: Rod = { kind: "Rod", name: `${rodType}-op`, rodType, cfg: {}, arg: {} };
-      const panel = makePanel(`stub-${rodType}`, [makeReceiveRod(), rod]);
-      const files = runGenerate(panel);
-      const handler = files.get(`handlers/stub-${rodType}.ts`) ?? "";
-      expect(handler).toContain("STRUX-STUB");
-    });
-  }
+  it("group: uses configured key field", () => {
+    const rod: Rod = {
+      kind: "Rod", name: "group-op", rodType: "group",
+      cfg: { key: { kind: "LitString", value: "category" } as unknown as Rod["cfg"][string] },
+      arg: {},
+    };
+    const panel = makePanel("test-group-key", [makeReceiveRod(), rod]);
+    const files = runGenerate(panel);
+    const handler = files.get("handlers/test-group-key.ts") ?? "";
+    expect(handler).toContain('"category"');
+  });
+
+  it("aggregate: count function", () => {
+    const rod: Rod = {
+      kind: "Rod", name: "agg-op", rodType: "aggregate",
+      cfg: { fn: { kind: "LitString", value: "count" } as unknown as Rod["cfg"][string] },
+      arg: {},
+    };
+    const panel = makePanel("test-agg-count", [makeReceiveRod(), rod]);
+    const files = runGenerate(panel);
+    const handler = files.get("handlers/test-agg-count.ts") ?? "";
+    expect(handler).toContain(".length");
+    expect(handler).not.toContain("STRUX-STUB");
+  });
+
+  it("aggregate: sum function with field", () => {
+    const rod: Rod = {
+      kind: "Rod", name: "agg-op", rodType: "aggregate",
+      cfg: {
+        fn: { kind: "LitString", value: "sum" } as unknown as Rod["cfg"][string],
+        field: { kind: "LitString", value: "amount" } as unknown as Rod["cfg"][string],
+      },
+      arg: {},
+    };
+    const panel = makePanel("test-agg-sum", [makeReceiveRod(), rod]);
+    const files = runGenerate(panel);
+    const handler = files.get("handlers/test-agg-sum.ts") ?? "";
+    expect(handler).toContain(".reduce");
+    expect(handler).toContain('"amount"');
+  });
+
+  it("merge: output contains spread concat", () => {
+    const rod: Rod = { kind: "Rod", name: "merge-op", rodType: "merge", cfg: {}, arg: {} };
+    const panel = makePanel("test-merge", [makeReceiveRod(), rod]);
+    const files = runGenerate(panel);
+    const handler = files.get("handlers/test-merge.ts") ?? "";
+    expect(handler).toContain("merged");
+    expect(handler).toContain("Array.isArray");
+    expect(handler).not.toContain("STRUX-STUB");
+  });
+
+  it("join: output contains join helper function", () => {
+    const rod: Rod = { kind: "Rod", name: "join-op", rodType: "join", cfg: {}, arg: {} };
+    const panel = makePanel("test-join", [makeReceiveRod(), rod]);
+    const files = runGenerate(panel);
+    const handler = files.get("handlers/test-join.ts") ?? "";
+    expect(handler).toContain("joinJoinOp");
+    expect(handler).toContain("rightIndex");
+    expect(handler).not.toContain("STRUX-STUB");
+  });
+
+  it("join: respects configured mode", () => {
+    const rod: Rod = {
+      kind: "Rod", name: "join-op", rodType: "join",
+      cfg: { mode: { kind: "LitString", value: "left" } as unknown as Rod["cfg"][string] },
+      arg: {},
+    };
+    const panel = makePanel("test-join-left", [makeReceiveRod(), rod]);
+    const files = runGenerate(panel);
+    const handler = files.get("handlers/test-join-left.ts") ?? "";
+    expect(handler).toContain("??");
+  });
+
+  it("window: output contains bucket-based windowing", () => {
+    const rod: Rod = { kind: "Rod", name: "win-op", rodType: "window", cfg: {}, arg: {} };
+    const panel = makePanel("test-window", [makeReceiveRod(), rod]);
+    const files = runGenerate(panel);
+    const handler = files.get("handlers/test-window.ts") ?? "";
+    expect(handler).toContain("windowed");
+    expect(handler).toContain("Math.floor");
+    expect(handler).not.toContain("STRUX-STUB");
+  });
+
+  it("window: parses duration size", () => {
+    const rod: Rod = {
+      kind: "Rod", name: "win-op", rodType: "window",
+      cfg: { size: { kind: "LitString", value: "30m" } as unknown as Rod["cfg"][string] },
+      arg: {},
+    };
+    const panel = makePanel("test-window-30m", [makeReceiveRod(), rod]);
+    const files = runGenerate(panel);
+    const handler = files.get("handlers/test-window-30m.ts") ?? "";
+    expect(handler).toContain("1800000"); // 30 * 60_000
+  });
+
+  it("store: output contains stateStore call", () => {
+    const rod: Rod = { kind: "Rod", name: "cache", rodType: "store", cfg: {}, arg: {} };
+    const panel = makePanel("test-store", [makeReceiveRod(), rod]);
+    const files = runGenerate(panel);
+    const handler = files.get("handlers/test-store.ts") ?? "";
+    expect(handler).toContain("stateStore.get");
+    expect(handler).not.toContain("STRUX-STUB");
+  });
+
+  it("store: put mode with namespace", () => {
+    const rod: Rod = {
+      kind: "Rod", name: "session-store", rodType: "store",
+      cfg: {
+        mode: { kind: "LitString", value: "put" } as unknown as Rod["cfg"][string],
+        backend: { kind: "LitString", value: "redis" } as unknown as Rod["cfg"][string],
+        namespace: { kind: "LitString", value: "sessions" } as unknown as Rod["cfg"][string],
+      },
+      arg: {},
+    };
+    const panel = makePanel("test-store-put", [makeReceiveRod(), rod]);
+    const files = runGenerate(panel);
+    const handler = files.get("handlers/test-store-put.ts") ?? "";
+    expect(handler).toContain("stateStore.put");
+    expect(handler).toContain("sessions");
+    expect(handler).toContain("redis");
+  });
 });
 
 // ---------------------------------------------------------------------------
 // Generator summary: Tier 2 stub panels flagged
 // ---------------------------------------------------------------------------
 
-describe("generator summary: Tier 2 stub panels flagged", () => {
-  it("console.log called with stub panel name when Tier 2 rod present", () => {
+describe("generator summary: Tier 2 panels", () => {
+  it("Tier 2 rods generate without non-demo-capable warning", () => {
     const logSpy = vi.spyOn(console, "log");
     const rod: Rod = { kind: "Rod", name: "group-op", rodType: "group", cfg: {}, arg: {} };
-    const panel = makePanel("stub-panel", [makeReceiveRod(), rod]);
+    const panel = makePanel("tier2-panel", [makeReceiveRod(), rod]);
     runGenerate(panel);
     const calls = logSpy.mock.calls.map(c => c.join(" "));
-    expect(calls.some(c => c.includes("stub-panel") && c.toLowerCase().includes("non-demo-capable"))).toBe(true);
-    logSpy.mockRestore();
-  });
-
-  it("console.log NOT called with non-demo-capable when no Tier 2 rod present", () => {
-    const logSpy = vi.spyOn(console, "log");
-    const panel = makePanel("clean-panel", [makeReceiveRod()]);
-    runGenerate(panel);
-    const calls = logSpy.mock.calls.map(c => c.join(" "));
+    // Tier 2 rods are now fully implemented — no stub warnings expected
     expect(calls.some(c => c.toLowerCase().includes("non-demo-capable"))).toBe(false);
     logSpy.mockRestore();
   });

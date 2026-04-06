@@ -1,5 +1,5 @@
 /**
- * Rod signature table — all 18 basic rod types.
+ * Rod signature table — all 18 basic rod types + standard rods.
  * Sourced from openstrux-spec/specs/modules/rods/overview.md
  *
  * Each signature defines the container kind of the primary in/out knots

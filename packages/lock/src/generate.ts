@@ -104,7 +104,8 @@ function normaliseWhitespace(decl: string): string {
   return decl.replace(/\s+/g, " ").trim();
 }
 
-function canonicalise(source: string): string {
+/** @internal Exported for sync-check testing against @openstrux/manifest. */
+export function canonicalise(source: string): string {
   const noComments = stripLineComments(source);
   const noCert = stripCertBlocks(noComments);
   const decls = splitDeclarations(noCert);

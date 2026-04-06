@@ -1,5 +1,6 @@
 /**
- * Rod step emitter dispatch — maps all 18 rod types to RodStepEmitter functions.
+ * Rod step emitter dispatch — maps all 18 basic + standard rod types to
+ * RodStepEmitter functions.
  *
  * Spec reference: openstrux-spec/specs/modules/target-nextjs/rods.md
  */

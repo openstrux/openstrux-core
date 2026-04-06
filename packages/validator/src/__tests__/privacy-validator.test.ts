@@ -101,11 +101,7 @@ describe("W_GDPR_LI_DPIA_RECOMMENDED", () => {
 // ---------------------------------------------------------------------------
 
 describe("E_PRIVACY_BYPASS", () => {
-  it("emits error when @privacy is declared but no private-data rod is present", () => {
-    // Note: @privacy decorator storage depends on parser support; we simulate
-    // by using the validate call on a source that exercises the bypass check.
-    // Full @privacy decorator parsing is a parser-level feature; this test
-    // validates the validator's response when the bypass condition is met.
+  it("does NOT emit when @privacy is absent", () => {
     const src = `
 @panel intake {
   @access { purpose: "grant_intake", operation: "write" }
@@ -113,10 +109,111 @@ describe("E_PRIVACY_BYPASS", () => {
   store  = write-data { target: db.sql.postgres { host: "localhost", port: 5432, db_name: "db", tls: true } }
 }`;
     const result = validate(parse(src));
-    // No E_PRIVACY_BYPASS without a @privacy decorator — this test confirms
-    // the rule is NOT triggered spuriously for panels without @privacy.
     const diag = result.diagnostics.find((d) => d.code === "E_PRIVACY_BYPASS");
     expect(diag).toBeUndefined();
+  });
+
+  it("emits error when @privacy is declared but no private-data rod is present", () => {
+    const src = `
+@panel intake {
+  @privacy { framework: gdpr }
+  @access { purpose: "grant_intake", operation: "write" }
+  recv   = receive   { trigger: http { method: "POST", path: "/data" } }
+  store  = write-data { target: db.sql.postgres { host: "localhost", port: 5432, db_name: "db", tls: true } }
+}`;
+    const result = validate(parse(src));
+    const diag = result.diagnostics.find((d) => d.code === "E_PRIVACY_BYPASS");
+    expect(diag).toBeDefined();
+    expect(diag?.severity).toBe("error");
+  });
+
+  it("does NOT emit when @privacy is declared and a private-data rod is present", () => {
+    const src = `
+@panel intake {
+  @privacy { framework: gdpr }
+  @access { purpose: "grant_intake", operation: "write" }
+  recv   = receive   { trigger: http { method: "POST", path: "/data" } }
+  pd     = private-data {
+    framework: gdpr { lawful_basis: consent, data_subject_categories: ["applicant"] }
+    purpose: "process applicant data"
+    retention: { duration: "P2Y", basis: consent }
+  }
+  store  = write-data { target: db.sql.postgres { host: "localhost", port: 5432, db_name: "db", tls: true } }
+}`;
+    const result = validate(parse(src));
+    const diag = result.diagnostics.find((d) => d.code === "E_PRIVACY_BYPASS");
+    expect(diag).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// E_GDPR_INVALID_BASIS_SPECIAL_CATEGORY
+// ---------------------------------------------------------------------------
+
+describe("E_GDPR_INVALID_BASIS_SPECIAL_CATEGORY", () => {
+  it("emits error when special-category data uses a disallowed lawful basis", () => {
+    const src = `
+@panel intake {
+  @access { purpose: "grant_intake", operation: "write" }
+  recv   = receive   { trigger: http { method: "POST", path: "/data" } }
+  pd     = private-data {
+    framework: gdpr { lawful_basis: legitimate_interest, data_subject_categories: ["patient"] }
+    purpose: "health data processing"
+    retention: { duration: "P5Y", basis: legal_obligation }
+    fields: {
+      medical_history: { sensitivity: special_category }
+    }
+  }
+  store  = write-data { target: db.sql.postgres { host: "localhost", port: 5432, db_name: "db", tls: true } }
+}`;
+    const result = validate(parse(src));
+    const diag = result.diagnostics.find((d) => d.code === "E_GDPR_INVALID_BASIS_SPECIAL_CATEGORY");
+    expect(diag).toBeDefined();
+    expect(diag?.severity).toBe("error");
+  });
+
+  it("does NOT emit when special-category data uses consent", () => {
+    const src = `
+@panel intake {
+  @access { purpose: "grant_intake", operation: "write" }
+  recv   = receive   { trigger: http { method: "POST", path: "/data" } }
+  pd     = private-data {
+    framework: gdpr { lawful_basis: consent, data_subject_categories: ["patient"] }
+    purpose: "health data processing"
+    retention: { duration: "P5Y", basis: consent }
+    fields: {
+      medical_history: { sensitivity: special_category }
+    }
+  }
+  store  = write-data { target: db.sql.postgres { host: "localhost", port: 5432, db_name: "db", tls: true } }
+}`;
+    const result = validate(parse(src));
+    const diag = result.diagnostics.find((d) => d.code === "E_GDPR_INVALID_BASIS_SPECIAL_CATEGORY");
+    expect(diag).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// E_BDSG_EMPLOYEE_CATEGORY
+// ---------------------------------------------------------------------------
+
+describe("E_BDSG_EMPLOYEE_CATEGORY", () => {
+  it("emits error when employee_data:true without employee_category under BDSG", () => {
+    const src = `
+@panel hr {
+  @access { purpose: "hr_processing", operation: "write" }
+  recv   = receive   { trigger: http { method: "POST", path: "/hr" } }
+  pd     = private-data {
+    framework: gdpr.bdsg { lawful_basis: consent, data_subject_categories: ["employee"], employee_data: true }
+    purpose: "employee data processing"
+    retention: { duration: "P10Y", basis: legal_obligation }
+  }
+  store  = write-data { target: db.sql.postgres { host: "localhost", port: 5432, db_name: "hr", tls: true } }
+}`;
+    const result = validate(parse(src));
+    const diag = result.diagnostics.find((d) => d.code === "E_BDSG_EMPLOYEE_CATEGORY");
+    expect(diag).toBeDefined();
+    expect(diag?.severity).toBe("error");
   });
 });
 

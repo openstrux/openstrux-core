@@ -11,8 +11,11 @@
 /**
  * Top-level lock file artifact written as snap.lock.
  *
- * Contract: same source + same LockFile = byte-identical mf.strux.json
- * contentHash and semantically identical generated code.
+ * Determinism contract: same source + same LockFile = byte-identical
+ * mf.strux.json contentHash and semantically identical generated code.
+ * Note: `generatedAt` is informational metadata excluded from the
+ * determinism contract — two builds at different times produce different
+ * timestamps but identical `sourceHash`, `entries`, and generated output.
  */
 export interface LockFile {
   /** Format version of the lock schema. "0.6" for this release. */

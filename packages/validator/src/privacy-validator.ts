@@ -175,10 +175,7 @@ function checkSpecialCategoryBasis(rod: RodNode, panelName: string): ValidationD
 // ---------------------------------------------------------------------------
 
 function panelHasPrivacyDecorator(panel: PanelNode): boolean {
-  // @privacy decorator storage in PanelNode is not yet implemented in the parser (v0.6).
-  // When parser support is added, check the relevant field here.
-  void panel;
-  return false;
+  return panel.privacy != null;
 }
 
 // ---------------------------------------------------------------------------

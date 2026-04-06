@@ -1,23 +1,13 @@
 /**
- * Tier 2 stub step emitters — group, aggregate, merge, join, window.
- * Each produces a STRUX-STUB chain step with a diagnostic comment.
+ * Tier 2 rod step emitters — re-exports from dedicated modules.
+ *
+ * Previously stubs; now fully implemented for the Next.js target.
+ * Spec reference: openstrux-spec/specs/modules/rods/overview.md
  */
 
-import type { Rod } from "@openstrux/ast";
-import type { ChainContext, ChainStep, RodStepEmitter } from "./types.js";
-
-function makeStub(rodType: string): RodStepEmitter {
-  return (rod: Rod, ctx: ChainContext): ChainStep => ({
-    imports: [],
-    statement: `// STRUX-STUB: ${rodType} — ${rod.name} — not implemented in v0.6`,
-    outputVar: ctx.inputVar,
-    outputType: ctx.inputType,
-  });
-}
-
-export const emitGroup     = makeStub("group");
-export const emitAggregate = makeStub("aggregate");
-export const emitMerge     = makeStub("merge");
-export const emitJoin      = makeStub("join");
-export const emitWindow    = makeStub("window");
-export const emitStore     = makeStub("store");
+export { emitGroup }     from "./group.js";
+export { emitAggregate } from "./aggregate.js";
+export { emitMerge }     from "./merge.js";
+export { emitJoin }      from "./join.js";
+export { emitWindow }    from "./window.js";
+export { emitStore }     from "./store.js";

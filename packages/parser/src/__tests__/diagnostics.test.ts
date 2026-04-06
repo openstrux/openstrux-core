@@ -238,6 +238,37 @@ describe("rod-level @ops parsing", () => {
 // ---------------------------------------------------------------------------
 // no-throw guarantee
 // ---------------------------------------------------------------------------
+// @privacy decorator
+// ---------------------------------------------------------------------------
+
+describe("@privacy decorator", () => {
+  it("parses @privacy block into PanelNode.privacy record", () => {
+    const result = parse(`@panel secure {
+  @privacy { framework: gdpr, dpa_ref: "DPA-2026-001" }
+  @access { purpose: "test", operation: "read" }
+  r = receive { trigger: http { method: "GET", path: "/x" } }
+  s = respond { status: 200 }
+}`);
+    const panel = result.ast.find((n): n is import("../../src/types.js").PanelNode => n.kind === "panel");
+    expect(panel).toBeDefined();
+    expect(panel!.privacy).toBeDefined();
+    expect(panel!.privacy!["framework"]).toBeDefined();
+    expect(panel!.privacy!["dpa_ref"]).toBeDefined();
+  });
+
+  it("omits privacy field when @privacy is absent", () => {
+    const result = parse(`@panel plain {
+  @access { purpose: "test", operation: "read" }
+  r = receive { trigger: http { method: "GET", path: "/x" } }
+  s = respond { status: 200 }
+}`);
+    const panel = result.ast.find((n): n is import("../../src/types.js").PanelNode => n.kind === "panel");
+    expect(panel).toBeDefined();
+    expect(panel!.privacy).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
 
 describe("no-throw guarantee", () => {
   it("never throws on malformed input", () => {
