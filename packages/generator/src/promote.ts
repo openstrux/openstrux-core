@@ -70,6 +70,27 @@ function promoteBlock(config: Record<string, KnotValue>): Record<string, unknown
 }
 
 // ---------------------------------------------------------------------------
+// Arg key mapping — keys in rod.knots that belong in `arg`, not `cfg`
+//
+// Per spec, each rod type has a distinct set of argument knots (data-bearing
+// inputs) vs. configuration knots (static options). This map drives the
+// cfg/arg split during promotion.
+// ---------------------------------------------------------------------------
+
+const ARG_KEYS: Readonly<Record<string, ReadonlySet<string>>> = {
+  filter:    new Set(["where"]),
+  guard:     new Set(["allow"]),
+  transform: new Set(["map"]),
+  split:     new Set(["by"]),
+  call:      new Set(["input"]),
+  group:     new Set(["key"]),
+  aggregate: new Set(["fn"]),
+  join:      new Set(["key"]),
+  store:     new Set(["mode"]),
+  merge:     new Set(),
+};
+
+// ---------------------------------------------------------------------------
 // StruxNode → TopLevelNode promotion
 // ---------------------------------------------------------------------------
 
@@ -114,28 +135,42 @@ export function promote(ast: StruxNode[]): TopLevelNode[] {
     }
 
     if (node.kind === "panel") {
-      // Build cfg dict from rod knots
+      // Build cfg/arg dicts from rod knots
       const rods: Rod[] = node.rods.map((rod): Rod => {
+        const argKeys = ARG_KEYS[rod.rodType] ?? new Set<string>();
         const cfg: Record<string, unknown> = {};
+        const arg: Record<string, unknown> = {};
         for (const [k, v] of Object.entries(rod.knots)) {
-          cfg[k] = promoteKnotValue(v);
+          if (argKeys.has(k)) {
+            arg[k] = promoteKnotValue(v);
+          } else {
+            cfg[k] = promoteKnotValue(v);
+          }
         }
         return {
           kind: "Rod",
           name: rod.name,
           rodType: rod.rodType,
           cfg: cfg as Rod["cfg"],
-          arg: {} as Rod["arg"],
+          arg: arg as Rod["arg"],
         };
       });
 
-      // Build minimal AccessContext from @access block
-      const rawAccess = node.access as Record<string, unknown> | undefined;
-      const intent = rawAccess
+      // Build minimal AccessContext from @access block.
+      // node.access is PanelAccessNode { kind, fields: Record<string, KnotValue> }
+      const accessNode = node.access as { fields?: Record<string, { kind: string; value?: unknown }> } | undefined;
+      const accessFields = accessNode?.fields ?? {};
+      const extractStr = (key: string): string => {
+        const v = accessFields[key];
+        if (!v) return "";
+        if (v.kind === "string" && typeof v.value === "string") return v.value;
+        return "";
+      };
+      const intent = node.access !== undefined
         ? {
-            purpose: String(rawAccess["purpose"] ?? ""),
-            basis: String(rawAccess["basis"] ?? ""),
-            operation: String(rawAccess["operation"] ?? "") as "read" | "write" | "delete" | "transform" | "export" | "audit",
+            purpose: extractStr("purpose"),
+            basis: extractStr("basis"),
+            operation: extractStr("operation") as "read" | "write" | "delete" | "transform" | "export" | "audit",
             urgency: "routine" as const,
           }
         : undefined;

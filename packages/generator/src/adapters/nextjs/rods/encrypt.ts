@@ -1,6 +1,6 @@
 import type { Rod } from "@openstrux/ast";
-import type { AccessContext } from "@openstrux/ast";
 import type { ChainContext, ChainStep } from "./types.js";
+import { getScopeFields } from "./config-extractors.js";
 
 export function emitEncrypt(_rod: Rod, ctx: ChainContext): ChainStep {
   const fields = getScopeFields(ctx.panel);
@@ -17,11 +17,4 @@ export function emitEncrypt(_rod: Rod, ctx: ChainContext): ChainStep {
     outputVar: "result",
     outputType: ctx.inputType,
   };
-}
-
-function getScopeFields(panel: unknown): string[] {
-  const access = (panel as { access?: AccessContext }).access;
-  const fieldMask = access?.scope?.fieldMask;
-  if (Array.isArray(fieldMask)) return [...fieldMask];
-  return [];
 }

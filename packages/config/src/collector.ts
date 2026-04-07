@@ -60,16 +60,34 @@ export function collectContextFiles(
   return { files, diagnostics };
 }
 
+/**
+ * Find the project root by searching upward for workspace/VCS markers.
+ * Priority: pnpm-workspace.yaml > .git > package.json
+ * Returns the highest-priority match found in the ancestor chain.
+ */
 function findProjectRoot(startDir: string): string {
-  const markers = ["pnpm-workspace.yaml", "package.json", ".git"];
+  const PRIORITY = ["pnpm-workspace.yaml", ".git", "package.json"] as const;
+  type Marker = typeof PRIORITY[number];
+
+  let best: { dir: string; priority: number } | undefined;
   let current = startDir;
+
   for (let i = 0; i < MAX_ANCESTOR_DEPTH; i++) {
-    for (const marker of markers) {
-      if (existsSync(join(current, marker))) return current;
+    for (let p = 0; p < PRIORITY.length; p++) {
+      const marker = PRIORITY[p] as Marker;
+      if (existsSync(join(current, marker))) {
+        if (best === undefined || p < best.priority) {
+          best = { dir: current, priority: p };
+        }
+        // pnpm-workspace.yaml is highest priority — stop immediately
+        if (p === 0) return current;
+        break;
+      }
     }
     const parent = dirname(current);
-    if (parent === current) return startDir;
+    if (parent === current) break; // filesystem root
     current = parent;
   }
-  return startDir;
+
+  return best?.dir ?? startDir;
 }

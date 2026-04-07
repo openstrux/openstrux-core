@@ -96,20 +96,8 @@ describe("strux build: happy path", () => {
 });
 
 describe("strux build: missing config", () => {
-  it("exits with error when strux.config.yaml is missing", async () => {
-    const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
-      throw new Error("process.exit");
-    }) as never);
-    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
-    await expect(runBuild(tmpDir)).rejects.toThrow("process.exit");
-
-    expect(exitSpy).toHaveBeenCalledWith(1);
-    const output = errSpy.mock.calls.flat().join(" ");
-    expect(output).toContain("config error");
-
-    exitSpy.mockRestore();
-    errSpy.mockRestore();
+  it("throws with config error message when strux.config.yaml is missing", async () => {
+    await expect(runBuild(tmpDir)).rejects.toThrow("config error");
   });
 });
 
@@ -121,20 +109,8 @@ describe("strux build: parse error", () => {
     writeFileSync(join(struxDir, "broken.strux"), INVALID_PANEL, "utf-8");
   });
 
-  it("exits with error when .strux file has syntax errors", async () => {
-    const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
-      throw new Error("process.exit");
-    }) as never);
-    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
-    await expect(runBuild(tmpDir)).rejects.toThrow("process.exit");
-
-    expect(exitSpy).toHaveBeenCalledWith(1);
-    const output = errSpy.mock.calls.flat().join(" ");
-    expect(output).toContain("parse error");
-
-    exitSpy.mockRestore();
-    errSpy.mockRestore();
+  it("throws with parse error message when .strux file has syntax errors", async () => {
+    await expect(runBuild(tmpDir)).rejects.toThrow("parse error");
   });
 });
 
@@ -155,6 +131,36 @@ describe("strux build: no matching files", () => {
     expect(existsSync(join(tmpDir, ".openstrux", "build"))).toBe(false);
 
     warnSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// F2 — matchGlob pattern matching
+// ---------------------------------------------------------------------------
+
+describe("matchGlob patterns (F2)", () => {
+  // Access the internal matchGlob via a re-export trick: we test it through the
+  // build behavior since matchGlob is not exported. These tests verify that the
+  // source-glob filtering works correctly for common patterns.
+
+  it("**/*.strux matches a file in a subdirectory", async () => {
+    writeFileSync(join(tmpDir, "strux.config.yaml"), STRUX_CONFIG, "utf-8");
+    const struxDir = join(tmpDir, "src", "strux", "subdir");
+    mkdirSync(struxDir, { recursive: true });
+    writeFileSync(join(struxDir, "deep.strux"), MINIMAL_PANEL, "utf-8");
+    await runBuild(tmpDir);
+    const outDir = join(tmpDir, ".openstrux", "build");
+    expect(existsSync(outDir)).toBe(true);
+  });
+
+  it("**/*.strux matches a file directly in the glob root", async () => {
+    writeFileSync(join(tmpDir, "strux.config.yaml"), STRUX_CONFIG, "utf-8");
+    const struxDir = join(tmpDir, "src", "strux");
+    mkdirSync(struxDir, { recursive: true });
+    writeFileSync(join(struxDir, "root.strux"), MINIMAL_PANEL, "utf-8");
+    await runBuild(tmpDir);
+    const outDir = join(tmpDir, ".openstrux", "build");
+    expect(existsSync(outDir)).toBe(true);
   });
 });
 

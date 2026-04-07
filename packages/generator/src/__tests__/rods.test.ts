@@ -16,6 +16,8 @@ import { generate } from "../index.js";
 import type { TopLevelNode } from "../types.js";
 import type { Panel, Rod } from "@openstrux/ast";
 import type { SplitRoutesExpr } from "@openstrux/ast";
+import { emitReceive } from "../adapters/nextjs/rods/receive.js";
+import { emitRespond } from "../adapters/nextjs/rods/respond.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirnameLocal = dirname(__filename);
@@ -521,5 +523,95 @@ describe("rod golden fixtures", () => {
     const files = runGenerate(panel);
     const actual = files.get("handlers/test-encrypt.ts") ?? "";
     expect(normalise(actual)).toEqual(normalise(goldenContent));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D2 — receive emitter: GET/DELETE operations emit const body = {}
+// ---------------------------------------------------------------------------
+
+describe("D2 — method-aware receive emitter", () => {
+  function makePanelWithOp(operation: string): Panel {
+    return {
+      kind: "Panel",
+      name: "test-panel",
+      dp: {},
+      access: {
+        kind: "AccessContext",
+        intent: { purpose: "test", basis: "", operation: operation as "read" | "write" | "delete" | "transform" | "export" | "audit", urgency: "routine" },
+      },
+      rods: [],
+      snaps: [],
+    };
+  }
+
+  it("emits 'const body = {}' for read operation (no req.json())", () => {
+    const ctx = { panel: makePanelWithOp("read"), previousSteps: [], inputVar: "req", inputType: "NextRequest" };
+    const rod: Rod = { kind: "Rod", name: "r", rodType: "receive", cfg: {}, arg: {} };
+    const step = emitReceive(rod, ctx);
+    expect(step.statement).toBe("const body = {};");
+    expect(step.statement).not.toContain("req.json");
+  });
+
+  it("emits 'const body = {}' for delete operation", async () => {
+    const ctx = { panel: makePanelWithOp("delete"), previousSteps: [], inputVar: "req", inputType: "NextRequest" };
+    const rod: Rod = { kind: "Rod", name: "r", rodType: "receive", cfg: {}, arg: {} };
+    const step = emitReceive(rod, ctx);
+    expect(step.statement).toBe("const body = {};");
+  });
+
+  it("emits 'await req.json()' for write operation", async () => {
+    const ctx = { panel: makePanelWithOp("write"), previousSteps: [], inputVar: "req", inputType: "NextRequest" };
+    const rod: Rod = { kind: "Rod", name: "r", rodType: "receive", cfg: {}, arg: {} };
+    const step = emitReceive(rod, ctx);
+    expect(step.statement).toContain("req.json");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D3 — respond emitter: operation-based status codes
+// ---------------------------------------------------------------------------
+
+describe("D3 — method-aware respond emitter", () => {
+  function makePanelWithOp(operation: string): Panel {
+    return {
+      kind: "Panel",
+      name: "test-panel",
+      dp: {},
+      access: {
+        kind: "AccessContext",
+        intent: { purpose: "test", basis: "", operation: operation as "read" | "write" | "delete" | "transform" | "export" | "audit", urgency: "routine" },
+      },
+      rods: [],
+      snaps: [],
+    };
+  }
+
+  it("emits status 200 for read operation", async () => {
+    const ctx = { panel: makePanelWithOp("read"), previousSteps: [], inputVar: "result", inputType: "unknown" };
+    const rod: Rod = { kind: "Rod", name: "resp", rodType: "respond", cfg: {}, arg: {} };
+    const step = emitRespond(rod, ctx);
+    expect(step.statement).toContain("status: 200");
+  });
+
+  it("emits status 201 for write operation", async () => {
+    const ctx = { panel: makePanelWithOp("write"), previousSteps: [], inputVar: "result", inputType: "unknown" };
+    const rod: Rod = { kind: "Rod", name: "resp", rodType: "respond", cfg: {}, arg: {} };
+    const step = emitRespond(rod, ctx);
+    expect(step.statement).toContain("status: 201");
+  });
+
+  it("emits status 204 for delete operation", async () => {
+    const ctx = { panel: makePanelWithOp("delete"), previousSteps: [], inputVar: "result", inputType: "unknown" };
+    const rod: Rod = { kind: "Rod", name: "resp", rodType: "respond", cfg: {}, arg: {} };
+    const step = emitRespond(rod, ctx);
+    expect(step.statement).toContain("status: 204");
+  });
+
+  it("defaults to status 200 for unknown operation", async () => {
+    const ctx = { panel: makePanelWithOp("audit"), previousSteps: [], inputVar: "result", inputType: "unknown" };
+    const rod: Rod = { kind: "Rod", name: "resp", rodType: "respond", cfg: {}, arg: {} };
+    const step = emitRespond(rod, ctx);
+    expect(step.statement).toContain("status: 200");
   });
 });

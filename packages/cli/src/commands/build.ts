@@ -8,7 +8,7 @@
  */
 
 import { readFileSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
-import { join, resolve, dirname, relative, matchesGlob } from "node:path";
+import { join, resolve, dirname, relative } from "node:path";
 import { parse } from "@openstrux/parser";
 import {
   loadConfig,
@@ -19,6 +19,25 @@ import {
   ConfigParseError,
 } from "@openstrux/generator";
 
+/**
+ * Minimal glob matcher supporting `**` and `*` wildcard patterns.
+ * Replaces Node 22+-only `matchesGlob` for compatibility.
+ *
+ * `**` matches zero or more path segments (including zero, i.e. `a/**​/b` matches `a/b`).
+ * `*` matches any sequence of non-separator characters.
+ */
+function matchGlob(str: string, pattern: string): boolean {
+  // Escape regex special chars (but not *)
+  let regexStr = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+  // Replace **/ with (.*/)?  so it matches zero or more path segments
+  regexStr = regexStr.replace(/\*\*\//g, "(?:.*/)?");
+  // Replace remaining ** (not followed by /) with .*
+  regexStr = regexStr.replace(/\*\*/g, ".*");
+  // Replace remaining * with [^/]*
+  regexStr = regexStr.replace(/\*/g, "[^/]*");
+  return new RegExp(`^${regexStr}$`).test(str);
+}
+
 export async function runBuild(projectRoot: string = process.cwd()): Promise<void> {
   // 1. Read config
   let config;
@@ -26,8 +45,7 @@ export async function runBuild(projectRoot: string = process.cwd()): Promise<voi
     config = loadConfig(projectRoot);
   } catch (e) {
     if (e instanceof ConfigParseError) {
-      console.error(`strux: config error — ${e.message}`);
-      process.exit(1);
+      throw new Error(`config error — ${e.message}`);
     }
     throw e;
   }
@@ -38,8 +56,7 @@ export async function runBuild(projectRoot: string = process.cwd()): Promise<voi
     resolved = resolveOptions(config);
   } catch (e) {
     if (e instanceof AdapterResolutionError) {
-      console.error(`strux: adapter resolution failed — ${e.message}`);
-      process.exit(1);
+      throw new Error(`adapter resolution failed — ${e.message}`);
     }
     throw e;
   }
@@ -58,11 +75,10 @@ export async function runBuild(projectRoot: string = process.cwd()): Promise<voi
     const result = parse(source);
     if (result.diagnostics && result.diagnostics.length > 0) {
       const rel = relative(projectRoot, filePath);
-      console.error(`strux: parse error in ${rel}:`);
-      for (const err of result.diagnostics) {
-        console.error(`  ${err.severity.toUpperCase()} ${err.code} [${err.line}:${err.col}] ${err.message}`);
-      }
-      process.exit(1);
+      const lines = result.diagnostics.map(
+        err => `  ${err.severity.toUpperCase()} ${err.code} [${err.line}:${err.col}] ${err.message}`
+      );
+      throw new Error(`parse error in ${rel}:\n${lines.join("\n")}`);
     }
     allNodes.push(...promote(result.ast));
   }
@@ -104,7 +120,7 @@ function findStruxFiles(root: string, sourceGlobs: string[]): string[] {
       } else if (entry.isFile() && entry.name.endsWith(".strux")) {
         const rel = relative(root, full);
         // If source globs are configured, only include files that match at least one
-        if (sourceGlobs.length === 0 || sourceGlobs.some((g) => matchesGlob(rel, g))) {
+        if (sourceGlobs.length === 0 || sourceGlobs.some((g) => matchGlob(rel, g))) {
           results.push(full);
         }
       }

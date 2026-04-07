@@ -53,7 +53,7 @@ export type GdprDpBasis =
   | "contract"
   | "legitimate_interest"
   | "legal_obligation"
-  | "vital_interest"
+  | "vital_interests"
   | "public_task";
 
 /** Lawful basis for processing — GDPR builtins get autocomplete; custom bases allowed. */

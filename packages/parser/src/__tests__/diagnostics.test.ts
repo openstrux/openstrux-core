@@ -285,3 +285,42 @@ describe("no-throw guarantee", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// B1 — constrained-string values are stripped of surrounding quotes
+// ---------------------------------------------------------------------------
+
+describe("B1 — constrained-string values without quotes", () => {
+  it("produces bare string values (no surrounding quotes) for constrained-string types", () => {
+    const result = parse(`@type Status = string["active", "inactive"]`);
+    // Find the union/constrained-string node by checking all nodes
+    for (const node of result.ast) {
+      if ("values" in node && Array.isArray((node as { values?: unknown[] }).values)) {
+        const values = (node as { values: unknown[] }).values as string[];
+        expect(values).not.toContain('"active"');
+        expect(values).not.toContain('"inactive"');
+        expect(values).toContain("active");
+        expect(values).toContain("inactive");
+      }
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// B2 — captureRawExpr stops at unbalanced ) at depth 0
+// ---------------------------------------------------------------------------
+
+describe("B2 — unbalanced paren in raw expression", () => {
+  it("parses a raw expression that contains nested parens without capturing the closing )", () => {
+    // The transform map field contains a raw expression with balanced parens
+    const result = parse(`@panel p {
+  @access { purpose: "test", operation: "transform" }
+  t = transform { map: items.filter((x) => x.active) }
+}`);
+    expect(result.diagnostics.filter((d) => d.severity === "error")).toHaveLength(0);
+    const panel = result.ast.find((n) => n.kind === "panel");
+    const rod = (panel as { rods?: { name: string; knots?: Record<string, unknown> }[] } | undefined)
+      ?.rods?.find((r) => r.name === "t");
+    expect(rod).toBeDefined();
+  });
+});

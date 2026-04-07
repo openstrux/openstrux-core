@@ -373,7 +373,8 @@ export class Parser {
             break;
           }
           this.consume();
-          values.push(vTok.value as string);
+          const raw = vTok.value as string;
+          values.push(raw.slice(1, -1).replace(/\\"/g, '"'));
           if (this.peek().type === TokenType.COMMA) this.consume();
         }
         this.expect(TokenType.RBRACKET, "closing ']' of string constraint");
@@ -516,7 +517,7 @@ export class Parser {
   }
 
   /** Parse `{ key: value, ... }` knot block (for @dp, rod bodies, nested configs). */
-  parseKnotBlock(): Record<string, KnotValue> {
+  private parseKnotBlock(): Record<string, KnotValue> {
     const result: Record<string, KnotValue> = {};
     if (this.peek().type !== TokenType.LBRACE) {
       this.addError("E000", "Expected '{' for block", this.peek());
@@ -661,7 +662,7 @@ export class Parser {
    * - raw expressions: `status == "submitted"`, `env("DB_HOST")`, etc.
    * - nested blocks: `{ key: val }`
    */
-  parseKnotValue(_key = ""): KnotValue {
+  private parseKnotValue(_key = ""): KnotValue {
     const tok = this.peek();
 
     // String literal
@@ -800,7 +801,10 @@ export class Parser {
       if (t.type === TokenType.LBRACE) braceDepth++;
       else if (t.type === TokenType.RBRACE) braceDepth--;
       else if (t.type === TokenType.LPAREN) parenDepth++;
-      else if (t.type === TokenType.RPAREN) parenDepth--;
+      else if (t.type === TokenType.RPAREN) {
+        if (parenDepth === 0) break; // closing paren belongs to outer context
+        parenDepth--;
+      }
       else if (t.type === TokenType.LBRACKET) bracketDepth++;
       else if (t.type === TokenType.RBRACKET) {
         if (bracketDepth === 0) break; // closing bracket belongs to outer context

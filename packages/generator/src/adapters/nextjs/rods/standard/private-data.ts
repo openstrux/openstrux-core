@@ -17,11 +17,13 @@
 
 import type { Rod } from "@openstrux/ast";
 import {
+  ENCRYPTION_FORCING_SENSITIVITIES,
   FRAMEWORK_PATH,
   GDPR_BASIS,
   PRIVATE_DATA_KNOT,
 } from "@openstrux/ast";
 import type { ChainContext, ChainStep } from "../types.js";
+import { resolveFrameworkPath } from "../../../../standard-rod-expander.js";
 
 export function emitPrivateData(rod: Rod, ctx: ChainContext): ChainStep {
   const cfg = rod.cfg as Record<string, unknown>;
@@ -54,19 +56,8 @@ export function emitPrivateData(rod: Rod, ctx: ChainContext): ChainStep {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers (mirrors standard-rod-expander.ts logic for consistency)
+// Helpers
 // ---------------------------------------------------------------------------
-
-function resolveFrameworkPath(cfg: Record<string, unknown>): string {
-  const fw = cfg[PRIVATE_DATA_KNOT.CFG_FRAMEWORK] as Record<string, unknown> | undefined;
-  if (!fw) return FRAMEWORK_PATH.GDPR;
-  if (fw["kind"] === "TypeRef") {
-    const name = fw["name"] as string;
-    if (name === FRAMEWORK_PATH.GDPR_BDSG || name === FRAMEWORK_PATH.BDSG) return FRAMEWORK_PATH.GDPR_BDSG;
-    return String(name);
-  }
-  return FRAMEWORK_PATH.GDPR;
-}
 
 function resolveEncryptionRequired(cfg: Record<string, unknown>, frameworkPath: string): boolean {
   if (frameworkPath === FRAMEWORK_PATH.GDPR_BDSG) return true;
@@ -78,9 +69,7 @@ function resolveEncryptionRequired(cfg: Record<string, unknown>, frameworkPath: 
   }
   const fields = cfg[PRIVATE_DATA_KNOT.CFG_FIELDS] as Array<{ sensitivity?: string }> | undefined;
   if (Array.isArray(fields)) {
-    return fields.some(
-      (f) => f.sensitivity === "special_category" || f.sensitivity === "highly_sensitive"
-    );
+    return fields.some((f) => ENCRYPTION_FORCING_SENSITIVITIES.has(f.sensitivity ?? ""));
   }
   return false;
 }

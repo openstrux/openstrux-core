@@ -280,3 +280,35 @@ describe("comments", () => {
     expect(values("foo // comment")).toEqual(["foo"]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Unterminated string (B1 context — lexer yields a STRING token truncated at newline)
+// ---------------------------------------------------------------------------
+
+describe("unterminated string", () => {
+  it("produces a STRING token truncated at newline", () => {
+    const toks = tokenize('"hello\nworld"').filter((t) => t.type !== TokenType.EOF);
+    // The lexer terminates at the newline, leaving the second line as ident tokens
+    expect(toks[0]?.type).toBe(TokenType.STRING);
+    expect(toks[0]?.value).toBe('"hello');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// `..` token — emitted as IDENT with value ".."
+// ---------------------------------------------------------------------------
+
+describe(".. token", () => {
+  it("tokenises .. as IDENT with value '..'", () => {
+    const toks = tokenize("..").filter((t) => t.type !== TokenType.EOF);
+    expect(toks).toHaveLength(1);
+    expect(toks[0]?.type).toBe(TokenType.IDENT);
+    expect(toks[0]?.value).toBe("..");
+  });
+
+  it("tokenises a.b..c as path tokens with .. in between", () => {
+    const toks = tokenize("a.b..c").filter((t) => t.type !== TokenType.EOF);
+    // a DOT b IDENT(..) c — lexer-specific: ".." is one IDENT
+    expect(toks.some((t) => t.value === "..")).toBe(true);
+  });
+});

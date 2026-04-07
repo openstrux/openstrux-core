@@ -26,8 +26,10 @@ export { LOCK_DIAGNOSTIC_MESSAGES } from "./types.js";
 
 export { serialise, deserialise } from "./io.js";
 
+export { canonicalise, computeContentHash } from "./canonicalise.js";
+
 export type { GenerateLockInput } from "./generate.js";
-export { generateLock, canonicalise } from "./generate.js";
+export { generateLock } from "./generate.js";
 
 export { readLock, verifyLock } from "./verify.js";
 

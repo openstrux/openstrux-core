@@ -126,3 +126,53 @@ describe("strux doctor: valid config, tsconfig paths configured", () => {
     expect(output).toContain("nextjs");
   });
 });
+
+// ---------------------------------------------------------------------------
+// F4 — exit code is 1 on failure
+// ---------------------------------------------------------------------------
+
+describe("F4 — doctor sets process.exitCode = 1 on failure", () => {
+  it("sets process.exitCode = 1 when config is missing", () => {
+    const prevExitCode = process.exitCode;
+    process.exitCode = undefined;
+    runDoctor(tmpDir);
+    expect(process.exitCode).toBe(1);
+    process.exitCode = prevExitCode;
+  });
+
+  it("does not set process.exitCode when everything is valid", () => {
+    writeFileSync(join(tmpDir, "strux.config.yaml"), VALID_CONFIG, "utf-8");
+    writeFileSync(join(tmpDir, "tsconfig.json"), TSCONFIG_WITH_PATHS, "utf-8");
+    const prevExitCode = process.exitCode;
+    process.exitCode = undefined;
+    runDoctor(tmpDir);
+    expect(process.exitCode).toBeFalsy();
+    process.exitCode = prevExitCode;
+  });
+});
+
+// ---------------------------------------------------------------------------
+// F5 — JSONC tsconfig parsing (// comments in tsconfig.json)
+// ---------------------------------------------------------------------------
+
+describe("F5 — JSONC-safe tsconfig parsing", () => {
+  it("parses tsconfig.json with // comments without failing", () => {
+    writeFileSync(join(tmpDir, "strux.config.yaml"), VALID_CONFIG, "utf-8");
+    const jsonWithComments = `{
+  // This is a comment
+  "compilerOptions": {
+    // Another comment
+    "paths": {
+      "@openstrux/build": [".openstrux/build"],
+      "@openstrux/build/*": [".openstrux/build/*"]
+    }
+  }
+}`;
+    writeFileSync(join(tmpDir, "tsconfig.json"), jsonWithComments, "utf-8");
+    runDoctor(tmpDir);
+    const output = logs.join("\n");
+    // Should not report "could not parse" — comments are stripped before parse
+    expect(output).not.toContain("could not parse");
+    expect(output).toContain("✓");
+  });
+});

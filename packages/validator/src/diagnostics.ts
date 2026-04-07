@@ -36,7 +36,7 @@
  *   E_BDSG_EMPLOYEE_CATEGORY           employee_data:true without employee_category (BDSG §26)
  */
 export interface ValidationDiagnostic {
-  readonly code: string;
+  readonly code: DiagnosticCode;
   readonly message: string;
   readonly severity: "error" | "warning";
   readonly line?: number | undefined;
@@ -72,4 +72,10 @@ export type DiagnosticCode =
   | "W_GDPR_LI_DPIA_RECOMMENDED"
   | "E_PRIVACY_BYPASS"
   | "E_PRIVATE_DATA_BYPASS"
-  | "E_BDSG_EMPLOYEE_CATEGORY";
+  | "E_BDSG_EMPLOYEE_CATEGORY"
+  // Duplicate / unknown declarations
+  | "E_DUPLICATE_TYPE"
+  | "W_SHADOW_BUILTIN"
+  | "W_UNKNOWN_ROD"
+  // @ops required subfields
+  | "E_OPS_MISSING_FIELD";

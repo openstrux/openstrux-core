@@ -3,6 +3,7 @@
  * Populated from RecordNode, EnumNode, UnionNode in the parse AST.
  */
 import type { RecordNode, EnumNode, UnionNode, StruxNode } from "@openstrux/parser";
+import type { ValidationDiagnostic } from "./diagnostics.js";
 
 export type TypeKind = "record" | "enum" | "union";
 
@@ -62,21 +63,24 @@ export class SymbolTable {
   /**
    * Populate the symbol table from a parse AST.
    * Phase 1: collect all @type declarations.
+   * Returns diagnostics for duplicate or shadowing declarations.
    */
-  populate(ast: readonly StruxNode[]): void {
+  populate(ast: readonly StruxNode[]): ValidationDiagnostic[] {
+    const diagnostics: ValidationDiagnostic[] = [];
     for (const node of ast) {
       if (node.kind === "record") {
-        this.addRecord(node);
+        diagnostics.push(...this.addRecord(node));
       } else if (node.kind === "enum") {
-        this.addEnum(node);
+        diagnostics.push(...this.addEnum(node));
       } else if (node.kind === "union") {
-        this.addUnion(node);
+        diagnostics.push(...this.addUnion(node));
       }
     }
+    return diagnostics;
   }
 
-  private addRecord(node: RecordNode): void {
-    this.table.set(node.name, {
+  private addRecord(node: RecordNode): ValidationDiagnostic[] {
+    return this.setEntry(node.name, {
       name: node.name,
       kind: "record",
       fields: node.fields.map((f) => f.name),
@@ -85,8 +89,8 @@ export class SymbolTable {
     });
   }
 
-  private addEnum(node: EnumNode): void {
-    this.table.set(node.name, {
+  private addEnum(node: EnumNode): ValidationDiagnostic[] {
+    return this.setEntry(node.name, {
       name: node.name,
       kind: "enum",
       fields: node.variants,
@@ -95,14 +99,42 @@ export class SymbolTable {
     });
   }
 
-  private addUnion(node: UnionNode): void {
-    this.table.set(node.name, {
+  private addUnion(node: UnionNode): ValidationDiagnostic[] {
+    return this.setEntry(node.name, {
       name: node.name,
       kind: "union",
       fields: node.variants.map((v) => v.tag),
       line: node.loc?.line,
       col: node.loc?.col,
     });
+  }
+
+  private setEntry(name: string, entry: TypeEntry): ValidationDiagnostic[] {
+    const existing = this.table.get(name);
+    if (existing !== undefined) {
+      if (existing.line === undefined) {
+        // Shadowing a built-in type — warn but allow override
+        this.table.set(name, entry);
+        return [{
+          code: "W_SHADOW_BUILTIN",
+          message: `Type '${name}' shadows a built-in standard type`,
+          severity: "warning",
+          line: entry.line,
+          col: entry.col,
+        }];
+      } else {
+        // Duplicate user-defined type — error, keep first
+        return [{
+          code: "E_DUPLICATE_TYPE",
+          message: `Duplicate type declaration '${name}' (first declared at line ${String(existing.line)})`,
+          severity: "error",
+          line: entry.line,
+          col: entry.col,
+        }];
+      }
+    }
+    this.table.set(name, entry);
+    return [];
   }
 
   /** Look up a type by name. Returns undefined if not found. */

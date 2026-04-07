@@ -31,11 +31,26 @@ const STRUX_VERSION: string = (typeof __STRUX_VERSION__ !== "undefined")
 
 const [, , command, ...args] = process.argv;
 
+function printUsage(): void {
+  console.log("strux — OpenStrux build tool\n");
+  console.log("Usage:");
+  console.log("  strux build   Build .strux files → .openstrux/build/");
+  console.log("  strux init    Initialize project (detect stack, write config)");
+  console.log("  strux doctor  Check config, adapters, and tsconfig paths");
+  console.log("\nOptions:");
+  console.log("  --version, -V  Print version");
+  console.log("  --help,    -h  Print this help message");
+}
+
 async function main(): Promise<void> {
   switch (command) {
     case "--version":
     case "-V":
       console.log(STRUX_VERSION);
+      break;
+    case "--help":
+    case "-h":
+      printUsage();
       break;
     case "build":
       await runBuild(args[0]);
@@ -47,11 +62,7 @@ async function main(): Promise<void> {
       runDoctor(args[0]);
       break;
     default:
-      console.log("strux — OpenStrux build tool\n");
-      console.log("Usage:");
-      console.log("  strux build   Build .strux files → .openstrux/build/");
-      console.log("  strux init    Initialize project (detect stack, write config)");
-      console.log("  strux doctor  Check config, adapters, and tsconfig paths");
+      printUsage();
       if (command) {
         console.error(`\nUnknown command: ${command}`);
         process.exit(1);

@@ -18,6 +18,30 @@ import {
   mkdirSync,
 } from "node:fs";
 import { join } from "node:path";
+
+/**
+ * Strip single-line `//` comments from JSON text (JSONC-safe parsing).
+ * Only strips comments outside string literals, handling `\"` escapes.
+ */
+function stripJsoncComments(text: string): string {
+  return text
+    .split("\n")
+    .map((line) => {
+      let inString = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (inString) {
+          if (ch === "\\" && i + 1 < line.length) { i++; continue; }
+          if (ch === '"') inString = false;
+        } else {
+          if (ch === '"') { inString = true; continue; }
+          if (ch === "/" && line[i + 1] === "/") return line.slice(0, i);
+        }
+      }
+      return line;
+    })
+    .join("\n");
+}
 import { createInterface } from "node:readline";
 import { BUNDLED_MANIFESTS } from "@openstrux/generator";
 import { runBuild } from "./build.js";
@@ -71,16 +95,14 @@ function detectStack(projectRoot: string): DetectedStack {
 // ---------------------------------------------------------------------------
 
 function writeStruxConfig(projectRoot: string, stack: DetectedStack): void {
-  const content = [
-    `target:`,
-    `  base: ${stack.base ?? "typescript@~5.5"}`,
-    `  framework: ${stack.framework ?? "next@^15.0"}`,
-    `  orm: ${stack.orm ?? "prisma@^6.0"}`,
-    `  validation: ${stack.validation ?? "zod@^3.23"}`,
-    `  runtime: ${stack.runtime}`,
-    ``,
-  ].join("\n");
-  writeFileSync(join(projectRoot, "strux.config.yaml"), content, "utf-8");
+  const lines = [`target:`];
+  lines.push(`  base: ${stack.base ?? "typescript@~5.5"}`);
+  if (stack.framework) lines.push(`  framework: ${stack.framework}`);
+  if (stack.orm)       lines.push(`  orm: ${stack.orm}`);
+  if (stack.validation) lines.push(`  validation: ${stack.validation}`);
+  lines.push(`  runtime: ${stack.runtime}`);
+  lines.push("");
+  writeFileSync(join(projectRoot, "strux.config.yaml"), lines.join("\n"), "utf-8");
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +118,7 @@ function configureTsconfig(projectRoot: string): void {
 
   let tsconfig: Record<string, unknown>;
   try {
-    tsconfig = JSON.parse(readFileSync(tsconfigPath, "utf-8")) as Record<string, unknown>;
+    tsconfig = JSON.parse(stripJsoncComments(readFileSync(tsconfigPath, "utf-8"))) as Record<string, unknown>;
   } catch {
     console.warn("strux init: could not parse tsconfig.json — skipping path alias configuration");
     return;

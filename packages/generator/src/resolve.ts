@@ -92,6 +92,7 @@ function satisfiesTerm(v: SemVer, term: string): boolean {
     const base = parseVersion(term.slice(1));
     if (!base) return false;
     if (base.major === 0) {
+      if (base.minor === 0) return v.major === 0 && v.minor === 0 && v.patch === base.patch;
       return v.major === 0 && v.minor === base.minor && v.patch >= base.patch;
     }
     return v.major === base.major && cmp(v, base) >= 0;

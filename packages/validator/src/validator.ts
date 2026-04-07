@@ -40,7 +40,7 @@ export function validate(
 
   // Phase 1: Collect all type declarations into symbol table
   const symbolTable = new SymbolTable();
-  symbolTable.populate(ast);
+  diagnostics.push(...symbolTable.populate(ast));
 
   // W003: Non-PascalCase type names
   diagnostics.push(...checkTypeNames(ast));

@@ -172,7 +172,7 @@ function isStandardRod(rod: Rod): boolean {
   return rod.rodType === ROD_TYPE.PRIVATE_DATA;
 }
 
-function resolveFrameworkPath(cfg: Record<string, unknown>): string {
+export function resolveFrameworkPath(cfg: Record<string, unknown>): string {
   const framework = cfg[PRIVATE_DATA_KNOT.CFG_FRAMEWORK] as Record<string, unknown> | undefined;
   if (!framework) return FRAMEWORK_PATH.GDPR;
   const path = (framework["_path"] as string) ??

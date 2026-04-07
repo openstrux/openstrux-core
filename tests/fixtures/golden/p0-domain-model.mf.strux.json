@@ -1,7 +1,7 @@
 {
   "schemaVersion": "0.6",
   "version": "0.6.0",
-  "contentHash": "95a213cbc1680ef7a6e989db3440129411b0af2002a76ed7a3c90c8da9b4f351",
+  "contentHash": "13eb83e267652d1c6325131fa6bf089b08df65e36d3580a46e70026401ab8ff1",
   "certificationScope": [
     "DataSource",
     "PostgresConfig",

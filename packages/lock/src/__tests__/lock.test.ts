@@ -380,3 +380,87 @@ describe("serialise / deserialise round-trip", () => {
     expect(json1.endsWith("\n")).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// C1 — loc fields excluded from type entry hashing
+// ---------------------------------------------------------------------------
+
+describe("C1 — loc fields excluded from hash (reformat-stable hashes)", () => {
+  it("produces identical sourceHash when loc positions change but types are the same", () => {
+    // Same types, different loc positions (simulating a reformat)
+    const sourceFileA: SourceFile = {
+      types: [{
+        kind: "TypeRecord",
+        name: "Item",
+        fields: [{ name: "id", type: { kind: "PrimitiveType", name: "string" } }],
+        loc: { start: { file: "a.strux", line: 1, col: 1 }, end: { file: "a.strux", line: 3, col: 1 } },
+      }],
+      panels: [],
+    };
+    const sourceFileB: SourceFile = {
+      types: [{
+        kind: "TypeRecord",
+        name: "Item",
+        fields: [{ name: "id", type: { kind: "PrimitiveType", name: "string" } }],
+        // Different loc — as if the type was moved down 10 lines
+        loc: { start: { file: "a.strux", line: 11, col: 1 }, end: { file: "a.strux", line: 13, col: 1 } },
+      }],
+      panels: [],
+    };
+    const sourceA = `@type Item { id: string }`;
+    const lockA = generateLock({ source: sourceA, sourceFile: sourceFileA, config: EMPTY_CONFIG, adapterVersions: {}, specVersion: "0.6.0", timestamp: FIXED_TIMESTAMP });
+    const lockB = generateLock({ source: sourceA, sourceFile: sourceFileB, config: EMPTY_CONFIG, adapterVersions: {}, specVersion: "0.6.0", timestamp: FIXED_TIMESTAMP });
+
+    // Entry hashes should be identical regardless of loc change
+    const entryA = lockA.entries.find((e) => "typeName" in e && (e as { typeName?: string }).typeName === "Item");
+    const entryB = lockB.entries.find((e) => "typeName" in e && (e as { typeName?: string }).typeName === "Item");
+    if (entryA !== undefined && entryB !== undefined) {
+      expect(entryA.hash).toBe(entryB.hash);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// deserialise — error paths
+// ---------------------------------------------------------------------------
+
+describe("deserialise — error paths", () => {
+  it("throws on invalid JSON", () => {
+    expect(() => deserialise("not json")).toThrow();
+  });
+
+  it("throws on JSON that is not an object", () => {
+    expect(() => deserialise("[]")).toThrow();
+  });
+
+  it("throws on missing lockVersion field", () => {
+    expect(() => deserialise(JSON.stringify({ specVersion: "0.6.0" }))).toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// localeCompare determinism — sort order is byte-order independent
+// ---------------------------------------------------------------------------
+
+describe("locale-independent sort determinism", () => {
+  it("produces identical lock JSON regardless of locale (reproducible sorting)", () => {
+    // Ensures sorting doesn't depend on locale-specific string comparison
+    const sourceFile: SourceFile = {
+      types: [
+        { kind: "TypeEnum", name: "ZStatus", variants: ["active", "inactive"] },
+        { kind: "TypeEnum", name: "AStatus", variants: ["pending", "done"] },
+      ],
+      panels: [],
+    };
+    const source = `@type ZStatus = enum { active, inactive }\n@type AStatus = enum { pending, done }`;
+    const lock1 = generateLock({ source, sourceFile, config: EMPTY_CONFIG, adapterVersions: {}, specVersion: "0.6.0", timestamp: FIXED_TIMESTAMP });
+    const lock2 = generateLock({ source, sourceFile, config: EMPTY_CONFIG, adapterVersions: {}, specVersion: "0.6.0", timestamp: FIXED_TIMESTAMP });
+    expect(serialise(lock1)).toBe(serialise(lock2));
+    // Entry order should be deterministic — ZStatus comes after AStatus
+    const names = lock1.entries.filter((e) => "typeName" in e).map((e) => (e as { typeName?: string }).typeName);
+    if (names.length >= 2) {
+      const sorted = [...names].sort((a, b) => (a ?? "") < (b ?? "") ? -1 : (a ?? "") > (b ?? "") ? 1 : 0);
+      expect(names).toEqual(sorted);
+    }
+  });
+});

@@ -189,7 +189,8 @@ describe("SymbolTable", () => {
     const src = `@type Proposal { id: string } @type Status = enum { draft, submitted }`;
     const { ast } = parse(src);
     const table = new SymbolTable();
-    table.populate(ast);
+    const populateDiags = table.populate(ast);
+    expect(populateDiags).toEqual([]);
     expect(table.has("Proposal")).toBe(true);
     expect(table.has("Status")).toBe(true);
     expect(table.has("Unknown")).toBe(false);
@@ -428,5 +429,115 @@ describe("classifyPolicyTier", () => {
         segments: ["hub", "my-org", "auth-policy"],
       }),
     ).toBe("hub");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// V002 — snap chain mismatch (positive case)
+// ---------------------------------------------------------------------------
+
+describe("V002 — snap chain type mismatch", () => {
+  it("emits V002 when filter (Stream output) is followed by respond (Single input)", () => {
+    // filter outputs Stream, respond expects Single — incompatible (Stream→Single mismatch)
+    const src = `@panel p {
+  @access { purpose: "test", operation: "read" }
+  fetch = read-data {}
+  filtered = filter { where: x }
+  resp = respond {}
+}`;
+    const result = validate(parse(src));
+    const v002 = result.diagnostics.find((d) => d.code === "V002");
+    expect(v002).toBeDefined();
+    expect(v002?.severity).toBe("error");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// E_DUPLICATE_TYPE (E1) — duplicate type declarations
+// ---------------------------------------------------------------------------
+
+describe("E_DUPLICATE_TYPE — duplicate type declarations", () => {
+  it("emits E_DUPLICATE_TYPE when the same user-defined type is declared twice", () => {
+    const src = `@type Proposal { id: string }
+@type Proposal { title: string }
+@panel p { @access { purpose: "test", operation: "read" } r = receive {} }`;
+    const result = validate(parse(src));
+    const dup = result.diagnostics.find((d) => d.code === "E_DUPLICATE_TYPE");
+    expect(dup).toBeDefined();
+    expect(dup?.severity).toBe("error");
+    expect(dup?.message).toContain("Proposal");
+  });
+
+  it("emits W_SHADOW_BUILTIN when a user type shadows a built-in standard type", () => {
+    const src = `@type PersonName { given_name: string }
+@panel p { @access { purpose: "test", operation: "read" } r = receive {} }`;
+    const result = validate(parse(src));
+    const shadow = result.diagnostics.find((d) => d.code === "W_SHADOW_BUILTIN");
+    expect(shadow).toBeDefined();
+    expect(shadow?.severity).toBe("warning");
+    expect(shadow?.message).toContain("PersonName");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// W_UNKNOWN_ROD (E2) — unknown rod type in snap chain
+// ---------------------------------------------------------------------------
+
+describe("W_UNKNOWN_ROD — unknown rod type", () => {
+  it("emits W_UNKNOWN_ROD for a rod with an unrecognized type in snap chain", () => {
+    const src = `@panel p {
+  @access { purpose: "test", operation: "read" }
+  r = receive {}
+  x = futuristic-rod {}
+  s = respond {}
+}`;
+    const result = validate(parse(src));
+    const warn = result.diagnostics.find((d) => d.code === "W_UNKNOWN_ROD");
+    expect(warn).toBeDefined();
+    expect(warn?.severity).toBe("warning");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// E_OPS_MISSING_FIELD (E3) — required subfields for @ops record blocks
+// ---------------------------------------------------------------------------
+
+describe("E_OPS_MISSING_FIELD — required @ops subfields", () => {
+  it("emits E_OPS_MISSING_FIELD when circuit_breaker is missing threshold", () => {
+    const src = `@panel p {
+  @access { purpose: "test", operation: "read" }
+  r = call {
+    @ops { circuit_breaker: { window: 1m } }
+  }
+}`;
+    const result = validate(parse(src));
+    const diag = result.diagnostics.find((d) => d.code === "E_OPS_MISSING_FIELD");
+    expect(diag).toBeDefined();
+    expect(diag?.message).toContain("threshold");
+  });
+
+  it("emits E_OPS_MISSING_FIELD when rate_limit is missing max", () => {
+    const src = `@panel p {
+  @access { purpose: "test", operation: "read" }
+  r = call {
+    @ops { rate_limit: { window: 1m } }
+  }
+}`;
+    const result = validate(parse(src));
+    const diag = result.diagnostics.find((d) => d.code === "E_OPS_MISSING_FIELD");
+    expect(diag).toBeDefined();
+    expect(diag?.message).toContain("max");
+  });
+
+  it("emits no E_OPS_MISSING_FIELD when all required subfields are present", () => {
+    const src = `@panel p {
+  @access { purpose: "test", operation: "read" }
+  r = call {
+    @ops { circuit_breaker: { threshold: 5, window: 1m } }
+  }
+}`;
+    const result = validate(parse(src));
+    const missing = result.diagnostics.filter((d) => d.code === "E_OPS_MISSING_FIELD");
+    expect(missing).toHaveLength(0);
   });
 });

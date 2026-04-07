@@ -22,6 +22,8 @@ interface OpsFieldSpec {
   readonly kind: OpsFieldKind;
   /** For record fields, the expected subfield specs. */
   readonly subfields?: Readonly<Record<string, OpsFieldKind>>;
+  /** For record fields, subfields that must be present. */
+  readonly required?: readonly string[];
 }
 
 const OPS_SCHEMA: Readonly<Record<string, OpsFieldSpec>> = {
@@ -31,10 +33,12 @@ const OPS_SCHEMA: Readonly<Record<string, OpsFieldSpec>> = {
   circuit_breaker: {
     kind: "record",
     subfields: { threshold: "number", window: "duration" },
+    required: ["threshold", "window"],
   },
   rate_limit: {
     kind: "record",
     subfields: { max: "number", window: "duration" },
+    required: ["max", "window"],
   },
 };
 
@@ -111,6 +115,20 @@ function validateOpsBlock(
           diagnostics.push({
             code: "E_OPS_TYPE_MISMATCH",
             message: `@ops field '${field}.${sub}' expects ${expectedKind} but got ${subValue.kind} in rod '${rod.name}' of panel '${panelName}'`,
+            severity: "error",
+            line: rod.loc?.line,
+            col: rod.loc?.col,
+            panel: panelName,
+            rod: rod.name,
+          });
+        }
+      }
+      // Check required subfields are present
+      for (const requiredSub of (spec.required ?? [])) {
+        if (!(requiredSub in value.config)) {
+          diagnostics.push({
+            code: "E_OPS_MISSING_FIELD",
+            message: `Required @ops subfield '${field}.${requiredSub}' is missing in rod '${rod.name}' of panel '${panelName}'`,
             severity: "error",
             line: rod.loc?.line,
             col: rod.loc?.col,

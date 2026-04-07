@@ -17,121 +17,34 @@ import type { SourceFile, TypeDef } from "@openstrux/ast";
 import type { ContextResolutionResult, RawNamedEndpoint } from "@openstrux/config";
 import type { LockEntry, LockFile } from "./types.js";
 
-// ---------------------------------------------------------------------------
-// Internal: source canonicalisation (RFC-0001 Annex A)
-//
-// Identical algorithm to @openstrux/manifest canonicalise.ts.
-// Duplicated here to avoid a circular dependency (manifest imports lock).
-// ---------------------------------------------------------------------------
-
-function stripLineComments(source: string): string {
-  return source
-    .split("\n")
-    .map((line) => {
-      let inString = false;
-      for (let i = 0; i < line.length - 1; i++) {
-        const ch = line[i];
-        if (ch === '"') inString = !inString;
-        if (!inString && ch === "/" && line[i + 1] === "/") {
-          return line.slice(0, i);
-        }
-      }
-      return line;
-    })
-    .join("\n");
-}
-
-function stripCertBlocks(source: string): string {
-  let result = "";
-  let i = 0;
-  while (i < source.length) {
-    if (source[i] === "@" && source.slice(i, i + 5) === "@cert") {
-      i += 5;
-      while (i < source.length && source[i] !== "{") i++;
-      if (i < source.length && source[i] === "{") {
-        let depth = 0;
-        while (i < source.length) {
-          if (source[i] === "{") depth++;
-          else if (source[i] === "}") {
-            depth--;
-            if (depth === 0) { i++; break; }
-          }
-          i++;
-        }
-      }
-    } else {
-      result += source[i];
-      i++;
-    }
-  }
-  return result;
-}
-
-function splitDeclarations(source: string): string[] {
-  const lines = source.split("\n");
-  const decls: string[] = [];
-  let current: string[] = [];
-  let depth = 0;
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (depth === 0 && (trimmed.startsWith("@type") || trimmed.startsWith("@panel"))) {
-      if (current.length > 0) {
-        const text = current.join("\n").trim();
-        if (text.length > 0) decls.push(text);
-      }
-      current = [line];
-    } else {
-      current.push(line);
-    }
-    for (const ch of line) {
-      if (ch === "{") depth++;
-      else if (ch === "}") depth = Math.max(0, depth - 1);
-    }
-  }
-  if (current.length > 0) {
-    const text = current.join("\n").trim();
-    if (text.length > 0) decls.push(text);
-  }
-  return decls;
-}
-
-function getDeclName(decl: string): string {
-  const m = decl.match(/@(?:type|panel)\s+(\S+)/);
-  return m?.[1] ?? decl;
-}
-
-function normaliseWhitespace(decl: string): string {
-  return decl.replace(/\s+/g, " ").trim();
-}
-
-/** @internal Exported for sync-check testing against @openstrux/manifest. */
-export function canonicalise(source: string): string {
-  const noComments = stripLineComments(source);
-  const noCert = stripCertBlocks(noComments);
-  const decls = splitDeclarations(noCert);
-  const normalised = decls.map(normaliseWhitespace);
-  const sorted = [...normalised].sort((a, b) => getDeclName(a).localeCompare(getDeclName(b)));
-  return sorted.join("\n");
-}
+import { canonicalise } from "./canonicalise.js";
 
 // ---------------------------------------------------------------------------
 // Internal: hashing utilities
 // ---------------------------------------------------------------------------
 
+/** Keys excluded from hash inputs — loc (source location) is unstable across reformats. */
+const HASH_SKIP_KEYS: ReadonlySet<string> = new Set(["loc"]);
+
 function sha256(data: string): string {
   return createHash("sha256").update(data, "utf8").digest("hex");
 }
 
+/** Deterministic byte-order comparison (locale-independent). */
+function byteCompare(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
 /**
  * Produce a deterministic stable JSON string from any value.
- * Object keys are sorted recursively.
+ * Object keys are sorted recursively; keys in HASH_SKIP_KEYS are excluded.
  */
 function stableJson(value: unknown): string {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return JSON.stringify(value);
   }
   const obj = value as Record<string, unknown>;
-  const sortedKeys = Object.keys(obj).sort();
+  const sortedKeys = Object.keys(obj).sort().filter((k) => !HASH_SKIP_KEYS.has(k));
   const parts = sortedKeys.map((k) => `${JSON.stringify(k)}:${stableJson(obj[k])}`);
   return `{${parts.join(",")}}`;
 }
@@ -156,7 +69,7 @@ function buildConfigEntries(
   prefix: "source" | "target"
 ): LockEntry[] {
   return Object.entries(endpoints)
-    .sort(([a], [b]) => a.localeCompare(b))
+    .sort(([a], [b]) => byteCompare(a, b))
     .map(([name, endpoint]) => ({
       key: `${prefix}:${name}`,
       kind: "config" as const,
@@ -168,7 +81,7 @@ function buildConfigEntries(
 /** Task 2.3: Record the adapter version for each target key. */
 function buildAdapterEntries(adapterVersions: Record<string, string>): LockEntry[] {
   return Object.entries(adapterVersions)
-    .sort(([a], [b]) => a.localeCompare(b))
+    .sort(([a], [b]) => byteCompare(a, b))
     .map(([key, version]) => ({
       key,
       kind: "adapter" as const,
@@ -240,8 +153,8 @@ export function generateLock(input: GenerateLockInput): LockFile {
     ...targetConfigEntries,
     ...typeEntries,
   ].sort((a, b) => {
-    const kindCmp = a.kind.localeCompare(b.kind);
-    return kindCmp !== 0 ? kindCmp : a.key.localeCompare(b.key);
+    const kindCmp = byteCompare(a.kind, b.kind);
+    return kindCmp !== 0 ? kindCmp : byteCompare(a.key, b.key);
   });
 
   return {

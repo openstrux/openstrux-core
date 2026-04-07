@@ -22,7 +22,30 @@ export function checkSnapChain(
       const currentSig = getRodSignature(current.rodType);
       const nextSig = getRodSignature(next.rodType);
 
-      if (currentSig === undefined || nextSig === undefined) continue;
+      if (currentSig === undefined) {
+        diagnostics.push({
+          code: "W_UNKNOWN_ROD",
+          message: `Unknown rod type '${current.rodType}' for rod '${current.name}' in panel '${panel.name}' — snap chain check skipped`,
+          severity: "warning",
+          line: current.loc?.line,
+          col: current.loc?.col,
+          panel: panel.name,
+          rod: current.name,
+        });
+        continue;
+      }
+      if (nextSig === undefined) {
+        diagnostics.push({
+          code: "W_UNKNOWN_ROD",
+          message: `Unknown rod type '${next.rodType}' for rod '${next.name}' in panel '${panel.name}' — snap chain check skipped`,
+          severity: "warning",
+          line: next.loc?.line,
+          col: next.loc?.col,
+          panel: panel.name,
+          rod: next.name,
+        });
+        continue;
+      }
 
       if (!areContainerKindsCompatible(currentSig.outKind, nextSig.inKind)) {
         diagnostics.push({
