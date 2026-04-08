@@ -17,6 +17,7 @@ import { validateOpsBlocks } from "./ops-schema.js";
 import { validateSchemaRefs } from "./schema-ref-validator.js";
 import { validateStreamConfigs } from "./stream-validator.js";
 import { validatePrivacy } from "./privacy-validator.js";
+import { validateAnnotations } from "./annotation-validator.js";
 
 export interface ValidateOptions extends CertValidationOptions {}
 
@@ -41,6 +42,9 @@ export function validate(
   // Phase 1: Collect all type declarations into symbol table
   const symbolTable = new SymbolTable();
   diagnostics.push(...symbolTable.populate(ast));
+
+  // Phase 1b: Annotation semantic checks (E_DUPLICATE_PK, E_EXTERNAL_PK, E_RELATION_*, etc.)
+  diagnostics.push(...validateAnnotations(ast, symbolTable));
 
   // W003: Non-PascalCase type names
   diagnostics.push(...checkTypeNames(ast));

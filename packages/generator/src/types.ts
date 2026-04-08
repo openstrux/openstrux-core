@@ -26,15 +26,21 @@ export type Manifest = Record<string, unknown>;
 
 /**
  * A single generated output file.
- * `path` is relative to the package output directory (not the project root).
+ * `path` is relative to the package output directory (not the project root),
+ * unless `projectRoot` is true — in which case it is relative to the project root.
  */
 export interface GeneratedFile {
-  /** Relative path from the package output directory. */
+  /** Relative path from the package output directory (or project root when projectRoot=true). */
   path: string;
   /** File content as a string. */
   content: string;
   /** Language identifier (e.g., "typescript", "prisma", "json"). */
   lang: string;
+  /**
+   * When true, the file is written relative to the project root rather than
+   * the adapter output directory. Used for `prisma/schema.prisma` (v0.6).
+   */
+  projectRoot?: boolean;
 }
 
 // ---------------------------------------------------------------------------

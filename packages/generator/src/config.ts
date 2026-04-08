@@ -37,6 +37,11 @@ export interface ParsedConfig {
   runtime:    ConfigEntry;
   /** Source glob patterns from the `source:` section. Empty if not specified. */
   source:     string[];
+  /**
+   * Output path for the Prisma schema relative to the project root.
+   * Defaults to `prisma/schema.prisma`. Configurable via `output.prisma_schema:` in strux.config.yaml.
+   */
+  prismaSchemaPath: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -71,6 +76,7 @@ export function parseConfig(yaml: string): ParsedConfig {
   let section: "none" | "target" | "source" | "output" = "none";
   const raw: Record<string, string> = {};
   const sourceGlobs: string[] = [];
+  let prismaSchemaPath = "prisma/schema.prisma";
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -98,6 +104,18 @@ export function parseConfig(yaml: string): ParsedConfig {
       const listMatch = trimmed.match(/^-\s+"(.+)"$/) ?? trimmed.match(/^-\s+'(.+)'$/) ?? trimmed.match(/^-\s+(.+)$/);
       if (listMatch) sourceGlobs.push(listMatch[1]!.trim());
     }
+
+    if (section === "output") {
+      // Key-value pairs under `output:` section
+      const colonIdx = trimmed.indexOf(":");
+      if (colonIdx !== -1) {
+        const key = trimmed.slice(0, colonIdx).trim();
+        const value = trimmed.slice(colonIdx + 1).trim().replace(/^["']|["']$/g, "");
+        if (key === "prisma_schema" && value !== "") {
+          prismaSchemaPath = value;
+        }
+      }
+    }
   }
 
   const required = ["base", "framework", "orm", "validation", "runtime"] as const;
@@ -108,12 +126,13 @@ export function parseConfig(yaml: string): ParsedConfig {
   }
 
   return {
-    base:       parseEntry(raw["base"]!,       "base"),
-    framework:  parseEntry(raw["framework"]!,  "framework"),
-    orm:        parseEntry(raw["orm"]!,         "orm"),
-    validation: parseEntry(raw["validation"]!,  "validation"),
-    runtime:    parseEntry(raw["runtime"]!,     "runtime"),
-    source:     sourceGlobs,
+    base:             parseEntry(raw["base"]!,       "base"),
+    framework:        parseEntry(raw["framework"]!,  "framework"),
+    orm:              parseEntry(raw["orm"]!,         "orm"),
+    validation:       parseEntry(raw["validation"]!,  "validation"),
+    runtime:          parseEntry(raw["runtime"]!,     "runtime"),
+    source:           sourceGlobs,
+    prismaSchemaPath,
   };
 }
 

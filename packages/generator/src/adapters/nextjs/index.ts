@@ -95,12 +95,32 @@ function emit(
     if (node.kind === "TypeRecord") recordMap.set(node.name, node);
   }
 
+  // inversions: model name → extra inverse fields (auto-generated from @relation)
+  const inversions = new Map<string, string[]>();
+
   // 1. @type nodes
   for (const node of ast) {
     switch (node.kind) {
-      case "TypeRecord": files.push(emitRecord(node, enumNames, prismaBlocks)); break;
-      case "TypeEnum":   files.push(emitEnum(node, prismaBlocks));             break;
-      case "TypeUnion":  files.push(emitUnion(node));                          break;
+      case "TypeRecord": files.push(emitRecord(node, enumNames, prismaBlocks, inversions)); break;
+      case "TypeEnum":   files.push(emitEnum(node, prismaBlocks));                          break;
+      case "TypeUnion":  files.push(emitUnion(node));                                       break;
+    }
+  }
+
+  // Apply auto-inverse fields to referenced Prisma model blocks
+  for (let i = 0; i < prismaBlocks.length; i++) {
+    const block = prismaBlocks[i]!;
+    // Extract model name from block header
+    const match = /^model (\w+) \{/.exec(block);
+    if (match === null) continue;
+    const modelName = match[1]!;
+    const extra = inversions.get(modelName);
+    if (extra === undefined || extra.length === 0) continue;
+    // Insert inverse fields before the closing brace (deduplicate)
+    const existingFields = new Set(extra.filter(f => block.includes(f.trim().split(" ")[0] ?? "")));
+    const toAdd = extra.filter(f => !existingFields.has(f));
+    if (toAdd.length > 0) {
+      prismaBlocks[i] = block.slice(0, -1) + toAdd.join("\n") + "\n}";
     }
   }
 

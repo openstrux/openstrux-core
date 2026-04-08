@@ -19,6 +19,10 @@ import {
   type NodeLoc,
   type PanelAccessNode,
   type PanelNode,
+  type ParseBlockAnnotation,
+  type ParseFieldAnnotation,
+  type ParsePkDefault,
+  type ParseReferentialAction,
   type ParseResult,
   type ParseTypeExpr,
   type RecordNode,
@@ -147,8 +151,19 @@ export class Parser {
     while (this.peek().type !== TokenType.EOF) {
       const tok = this.peek();
 
-      if (tok.type === TokenType.AT_TYPE) {
-        const node = this.parseTypeDecl();
+      if (tok.type === TokenType.AT_UNKNOWN && tok.value === "@external") {
+        // @external type Name { ... }
+        this.consume(); // consume @external
+        const nextTok = this.peek();
+        if (nextTok.type !== TokenType.AT_TYPE) {
+          this.addError("E000", `Expected @type after @external, got ${JSON.stringify(nextTok.value)}`, nextTok);
+          this.recover();
+        } else {
+          const node = this.parseTypeDecl(true);
+          if (node !== null) ast.push(node);
+        }
+      } else if (tok.type === TokenType.AT_TYPE) {
+        const node = this.parseTypeDecl(false);
         if (node !== null) ast.push(node);
       } else if (tok.type === TokenType.AT_PANEL) {
         const node = this.parsePanel();
@@ -178,7 +193,8 @@ export class Parser {
   // @type declarations
   // -------------------------------------------------------------------------
 
-  private parseTypeDecl(): RecordNode | EnumNode | UnionNode | null {
+  /** @param external — true when preceded by `@external` keyword */
+  private parseTypeDecl(external = false): RecordNode | EnumNode | UnionNode | null {
     const atTok = this.consume(); // consume @type
     const nameTok = this.peek();
     if (nameTok.type !== TokenType.IDENT) {
@@ -189,8 +205,21 @@ export class Parser {
     this.consume(); // consume name
     const name = nameTok.value;
 
+    // Collect type-level decorators: @timestamps, @sealed (AT_UNKNOWN tokens before '{' or '=')
+    let timestamps = false;
+    while (this.peek().type === TokenType.AT_UNKNOWN) {
+      const decTok = this.consume();
+      if (decTok.value === "@timestamps") {
+        timestamps = true;
+      } else if (decTok.value === "@sealed") {
+        // @sealed — accepted but no runtime flag needed here (validator handles)
+      } else {
+        this.addError("E000", `Unknown type decorator ${JSON.stringify(decTok.value)}`, decTok);
+      }
+    }
+
     if (this.peek().type === TokenType.LBRACE) {
-      return this.parseRecord(name, this.loc(atTok));
+      return this.parseRecord(name, this.loc(atTok), external, timestamps);
     } else if (this.peek().type === TokenType.EQUALS) {
       this.consume(); // consume =
       const kw = this.peek();
@@ -210,25 +239,65 @@ export class Parser {
     }
   }
 
-  /** Parse `{ field: Type, ... }` record body (assumes @type Name already consumed). */
-  private parseRecord(name: string, loc: NodeLoc): RecordNode | null {
+  /** Parse `{ field: Type @annotations, ... }` record body. */
+  private parseRecord(
+    name: string,
+    loc: NodeLoc,
+    external = false,
+    timestamps = false,
+  ): RecordNode | null {
     const lbrace = this.expect(TokenType.LBRACE, "opening '{' of record");
     if (lbrace === null) return null;
 
     const fields: FieldDecl[] = [];
+    const blockAnnotations: ParseBlockAnnotation[] = [];
 
     while (this.peek().type !== TokenType.RBRACE && this.peek().type !== TokenType.EOF) {
       this.skipNewlines();
       if (this.peek().type === TokenType.RBRACE || this.peek().type === TokenType.EOF) break;
 
-      const fieldTok = this.peek();
-      if (fieldTok.type !== TokenType.IDENT) {
-        this.addError("E000", `Expected field name, got ${JSON.stringify(fieldTok.value)}`, fieldTok);
+      const tok = this.peek();
+
+      // ---- Block annotations: `@@index`, `@@unique`, `@@table`, `@@map`, `@opaque` ----
+      if (tok.type === TokenType.AT_UNKNOWN) {
+        // `@@xxx` is lexed as two AT_UNKNOWN tokens: "@" then "@xxx"
+        if (tok.value === "@") {
+          const doublAt = this.consume(); // consume first "@"
+          const nameTok2 = this.peek();
+          if (nameTok2.type === TokenType.AT_UNKNOWN) {
+            this.consume(); // consume second "@xxx"
+            const annotation = this.parseDoubleAtAnnotation(nameTok2.value, doublAt);
+            if (annotation !== null) blockAnnotations.push(annotation);
+          } else {
+            this.addError("E000", `Expected block annotation name after '@@'`, nameTok2);
+          }
+          if (this.peek().type === TokenType.COMMA) this.consume();
+          this.skipNewlines();
+          continue;
+        }
+        // Single `@opaque <content>`
+        if (tok.value === "@opaque") {
+          this.consume(); // consume @opaque
+          const content = this.consumeRestOfLine();
+          blockAnnotations.push({ kind: "opaque", content: content.trim() });
+          this.skipNewlines();
+          continue;
+        }
+        // Unknown AT_UNKNOWN at field position — error
+        this.addError("E000", `Unexpected annotation ${JSON.stringify(tok.value)} in record body (expected field name or block annotation)`, tok);
+        this.consume();
+        this.recover();
+        continue;
+      }
+
+      // ---- Field declaration ----
+      if (tok.type !== TokenType.IDENT) {
+        this.addError("E000", `Expected field name, got ${JSON.stringify(tok.value)}`, tok);
         this.recover();
         continue;
       }
       this.consume(); // consume field name
-      const fieldName = fieldTok.value;
+      const fieldName = tok.value;
 
       if (this.expect(TokenType.COLON, `':' after field '${fieldName}'`) === null) {
         this.recover();
@@ -240,7 +309,11 @@ export class Parser {
         this.recover();
         continue;
       }
-      fields.push({ name: fieldName, type: typeExpr });
+
+      // Parse zero or more field-level annotations
+      const annotations = this.parseFieldAnnotations();
+
+      fields.push({ name: fieldName, type: typeExpr, annotations });
 
       // Allow comma or newline as separator
       if (this.peek().type === TokenType.COMMA) this.consume();
@@ -253,7 +326,237 @@ export class Parser {
       return null;
     }
 
-    return { kind: "record", name, fields, loc };
+    return { kind: "record", name, fields, blockAnnotations, external, timestamps, loc };
+  }
+
+  /** Parse block annotation `@index(...)`, `@unique(...)`, `@table(...)`, `@map(...)`.
+   *  Called after consuming both `@` tokens; `value` is the second AT_UNKNOWN value. */
+  private parseDoubleAtAnnotation(value: string, startTok: Token): ParseBlockAnnotation | null {
+    // value is like "@index", "@unique", "@table", "@map"
+    const annotName = value.slice(1); // strip leading @
+    switch (annotName) {
+      case "index":
+      case "unique": {
+        // @@index([f1, f2]) or @@unique([f1, f2])
+        if (this.peek().type === TokenType.LPAREN) this.consume();
+        if (this.peek().type === TokenType.LBRACKET) this.consume();
+        const fieldNames: string[] = [];
+        while (this.peek().type !== TokenType.RBRACKET && this.peek().type !== TokenType.EOF) {
+          const ft = this.peek();
+          if (ft.type !== TokenType.IDENT) { this.recover(); break; }
+          fieldNames.push(ft.value);
+          this.consume();
+          if (this.peek().type === TokenType.COMMA) this.consume();
+        }
+        if (this.peek().type === TokenType.RBRACKET) this.consume();
+        if (this.peek().type === TokenType.RPAREN) this.consume();
+        return { kind: annotName as "index" | "unique", fields: fieldNames };
+      }
+      case "table":
+      case "map": {
+        // @@table("name") or @@map("name")
+        if (annotName === "map") {
+          this.addWarning("W_ANNOTATION_ALIAS", `@@map is an alias for @@table — use @@table(...) for canonical Openstrux syntax`, startTok);
+        }
+        if (this.peek().type === TokenType.LPAREN) this.consume();
+        const strTok = this.peek();
+        let tableName = "";
+        if (strTok.type === TokenType.STRING) {
+          tableName = strTok.value.slice(1, -1);
+          this.consume();
+        } else {
+          this.addError("E000", `Expected string after @@${annotName}`, strTok);
+        }
+        if (this.peek().type === TokenType.RPAREN) this.consume();
+        return { kind: "table", name: tableName };
+      }
+      default: {
+        this.addError("E000", `Unknown block annotation @@${annotName}`, startTok);
+        this.consumeRestOfLine();
+        return null;
+      }
+    }
+  }
+
+  /** Consume tokens until end of line (NEWLINE or EOF); return joined text. */
+  private consumeRestOfLine(): string {
+    let text = "";
+    while (
+      this.peek().type !== TokenType.NEWLINE &&
+      this.peek().type !== TokenType.EOF &&
+      this.peek().type !== TokenType.RBRACE
+    ) {
+      text += this.peek().value;
+      this.consume();
+    }
+    return text;
+  }
+
+  /** Parse zero or more field-level annotations after a field type expression. */
+  private parseFieldAnnotations(): ParseFieldAnnotation[] {
+    const annotations: ParseFieldAnnotation[] = [];
+    while (this.peek().type === TokenType.AT_UNKNOWN) {
+      // `@@` block annotations are lexed as bare `@` followed by `@xxx` — stop here so the
+      // outer record-body loop can handle them as block annotations.
+      if (this.peek().value === "@") break;
+      const annTok = this.peek();
+      const annName = annTok.value; // e.g. "@pk", "@unique"
+      this.consume();
+      const ann = this.parseOneFieldAnnotation(annName, annTok);
+      if (ann !== null) annotations.push(ann);
+    }
+    return annotations;
+  }
+
+  private parseOneFieldAnnotation(annName: string, annTok: Token): ParseFieldAnnotation | null {
+    switch (annName) {
+      case "@pk":
+      case "@id": {
+        if (annName === "@id") {
+          this.addWarning("W_ANNOTATION_ALIAS", `@id is an alias for @pk — use @pk for canonical Openstrux syntax`, annTok);
+        }
+        // @pk or @pk(default: cuid|uuid|ulid|autoincrement)
+        if (this.peek().type === TokenType.LPAREN) {
+          this.consume(); // consume (
+          // expect "default"
+          const keyTok = this.peek();
+          if (keyTok.type === TokenType.IDENT && keyTok.value === "default") {
+            this.consume();
+            if (this.peek().type === TokenType.COLON) this.consume();
+            const valTok = this.peek();
+            if (valTok.type === TokenType.IDENT) {
+              this.consume();
+              // Strip trailing () if alias style (e.g. "cuid()")
+              const raw = valTok.value.replace(/\(\)$/, "");
+              const pkDefault = raw as ParsePkDefault;
+              if (this.peek().type === TokenType.LPAREN) this.consume();
+              if (this.peek().type === TokenType.RPAREN) this.consume(); // inner ()
+              if (this.peek().type === TokenType.RPAREN) this.consume(); // outer )
+              return { kind: "pk", default: pkDefault };
+            }
+          }
+          // Consume remaining until )
+          while (this.peek().type !== TokenType.RPAREN && this.peek().type !== TokenType.EOF) this.consume();
+          if (this.peek().type === TokenType.RPAREN) this.consume();
+          return { kind: "pk" };
+        }
+        return { kind: "pk" };
+      }
+
+      case "@default": {
+        if (this.peek().type !== TokenType.LPAREN) return { kind: "default", value: "now" };
+        this.consume(); // consume (
+        const valTok = this.peek();
+        let value: "now" | string | number | boolean = "now";
+        if (valTok.type === TokenType.IDENT) {
+          const raw = valTok.value;
+          if (raw === "now") value = "now";
+          else if (raw === "true") value = true;
+          else if (raw === "false") value = false;
+          else value = raw;
+          this.consume();
+        } else if (valTok.type === TokenType.NUMBER) {
+          value = Number(valTok.value);
+          this.consume();
+        } else if (valTok.type === TokenType.STRING) {
+          value = valTok.value.slice(1, -1);
+          this.consume();
+        }
+        if (this.peek().type === TokenType.RPAREN) this.consume();
+        return { kind: "default", value };
+      }
+
+      case "@unique":
+        return { kind: "unique" };
+
+      case "@updatedAt":
+        return { kind: "updatedAt" };
+
+      case "@ignore":
+        return { kind: "ignore" };
+
+      case "@column":
+      case "@map": {
+        if (annName === "@map") {
+          this.addWarning("W_ANNOTATION_ALIAS", `@map is an alias for @column — use @column(...) for canonical Openstrux syntax`, annTok);
+        }
+        if (this.peek().type !== TokenType.LPAREN) {
+          this.addError("E000", `Expected '(' after ${annName}`, annTok);
+          return null;
+        }
+        this.consume(); // consume (
+        const strTok = this.peek();
+        if (strTok.type !== TokenType.STRING) {
+          this.addError("E000", `Expected string literal in ${annName}(...)`, strTok);
+          while (this.peek().type !== TokenType.RPAREN && this.peek().type !== TokenType.EOF) this.consume();
+          if (this.peek().type === TokenType.RPAREN) this.consume();
+          return null;
+        }
+        const colName = strTok.value.slice(1, -1);
+        this.consume();
+        if (this.peek().type === TokenType.RPAREN) this.consume();
+        return { kind: "column", name: colName };
+      }
+
+      case "@relation": {
+        if (this.peek().type !== TokenType.LPAREN) {
+          this.addError("E000", `Expected '(' after @relation`, annTok);
+          return null;
+        }
+        this.consume(); // consume (
+        let relField = "";
+        let refModel = "";
+        let refField = "";
+        let onDelete: ParseReferentialAction | undefined;
+        let onUpdate: ParseReferentialAction | undefined;
+
+        while (this.peek().type !== TokenType.RPAREN && this.peek().type !== TokenType.EOF) {
+          const keyTok = this.peek();
+          if (keyTok.type !== TokenType.IDENT) { this.consume(); continue; }
+          const key = keyTok.value;
+          this.consume();
+          if (this.peek().type === TokenType.COLON) this.consume();
+
+          if (key === "field") {
+            const ft = this.peek();
+            if (ft.type === TokenType.IDENT) { relField = ft.value; this.consume(); }
+          } else if (key === "ref") {
+            // ref: Model.field
+            const modelTok = this.peek();
+            if (modelTok.type === TokenType.IDENT) {
+              refModel = modelTok.value; this.consume();
+              if (this.peek().type === TokenType.DOT) {
+                this.consume(); // consume .
+                const fieldTok2 = this.peek();
+                if (fieldTok2.type === TokenType.IDENT) { refField = fieldTok2.value; this.consume(); }
+              }
+            }
+          } else if (key === "onDelete" || key === "onUpdate") {
+            const actionTok = this.peek();
+            if (actionTok.type === TokenType.IDENT) {
+              const action = actionTok.value as ParseReferentialAction;
+              this.consume();
+              if (key === "onDelete") onDelete = action;
+              else onUpdate = action;
+            }
+          }
+          if (this.peek().type === TokenType.COMMA) this.consume();
+        }
+        if (this.peek().type === TokenType.RPAREN) this.consume();
+        return {
+          kind: "relation",
+          field: relField,
+          ref: { model: refModel, field: refField },
+          ...(onDelete !== undefined ? { onDelete } : {}),
+          ...(onUpdate !== undefined ? { onUpdate } : {}),
+        };
+      }
+
+      default: {
+        this.addError("E000", `Unknown field annotation ${JSON.stringify(annName)} — use @pk, @default, @unique, @relation, @updatedAt, @column, @ignore`, annTok);
+        return null;
+      }
+    }
   }
 
   /** Parse `enum { val1, val2 }` (assumes @type Name = already consumed). */

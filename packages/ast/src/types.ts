@@ -55,12 +55,46 @@ export interface TypeRef extends NodeBase {
 }
 
 // ---------------------------------------------------------------------------
+// Persistence annotations — field-level (v0.6)
+// Spec reference: openstrux-spec/specs/core/type-system.md §7
+// ---------------------------------------------------------------------------
+
+export type ReferentialAction = "Cascade" | "SetNull" | "Restrict" | "NoAction";
+
+export type PkDefault = "cuid" | "uuid" | "ulid" | "autoincrement";
+
+export type FieldAnnotation =
+  | { readonly kind: "pk";       readonly default?: PkDefault }
+  | { readonly kind: "default";  readonly value: "now" | string | number | boolean }
+  | { readonly kind: "unique" }
+  | { readonly kind: "relation";
+      readonly field: string;
+      readonly ref: { readonly model: string; readonly field: string };
+      readonly onDelete?: ReferentialAction;
+      readonly onUpdate?: ReferentialAction }
+  | { readonly kind: "updatedAt" }
+  | { readonly kind: "column";   readonly name: string }
+  | { readonly kind: "ignore" };
+
+// ---------------------------------------------------------------------------
+// Persistence annotations — block-level (v0.6)
+// ---------------------------------------------------------------------------
+
+export type TypeBlockAnnotation =
+  | { readonly kind: "index";  readonly fields: readonly string[] }
+  | { readonly kind: "unique"; readonly fields: readonly string[] }
+  | { readonly kind: "table";  readonly name: string }
+  | { readonly kind: "opaque"; readonly content: string };
+
+// ---------------------------------------------------------------------------
 // Record fields
 // ---------------------------------------------------------------------------
 
 export interface FieldDecl {
   readonly name: string;
   readonly type: TypeExpr;
+  /** Field-level persistence annotations, v0.6. Absent or empty array when none. */
+  readonly annotations?: readonly FieldAnnotation[];
 }
 
 // ---------------------------------------------------------------------------
@@ -71,6 +105,12 @@ export interface TypeRecord extends NodeBase {
   readonly kind: "TypeRecord";
   readonly name: string;
   readonly fields: readonly FieldDecl[];
+  /** True when declared with `@external type`. No DDL is emitted. (v0.6, optional for back-compat) */
+  readonly external?: boolean;
+  /** True when `@timestamps` decorator is present. (v0.6, optional for back-compat) */
+  readonly timestamps?: boolean;
+  /** Block-level persistence annotations inside the record body. (v0.6, optional for back-compat) */
+  readonly annotations?: readonly TypeBlockAnnotation[];
 }
 
 // ---------------------------------------------------------------------------

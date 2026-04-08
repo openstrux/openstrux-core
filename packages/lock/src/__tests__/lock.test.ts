@@ -33,26 +33,27 @@ const EMPTY_CONFIG: ContextResolutionResult = {
 
 const FIXED_TIMESTAMP = "2026-01-01T00:00:00.000Z";
 
+/** Helper: build a FieldDecl with no persistence annotations (pre-v0.6 style). */
+function field(name: string, type: FieldDecl["type"]): FieldDecl {
+  return { name, type, annotations: [] };
+}
+
 // P0 domain model — minimal SourceFile used in determinism tests
 const P0_SOURCE_FILE: SourceFile = {
   types: [
     {
       kind: "TypeRecord",
       name: "Proposal",
+      external: false,
+      timestamps: false,
+      annotations: [],
       fields: [
-        { name: "id", type: { kind: "PrimitiveType", name: "string" } },
-        { name: "title", type: { kind: "PrimitiveType", name: "string" } },
-        { name: "submitter", type: { kind: "PrimitiveType", name: "string" } },
-        {
-          name: "description",
-          type: {
-            kind: "ContainerType",
-            container: "Optional",
-            typeArgs: [{ kind: "PrimitiveType", name: "string" }],
-          },
-        },
-        { name: "submitted_at", type: { kind: "PrimitiveType", name: "date" } },
-        { name: "status", type: { kind: "TypeRef", name: "ReviewStatus" } },
+        field("id",          { kind: "PrimitiveType", name: "string" }),
+        field("title",       { kind: "PrimitiveType", name: "string" }),
+        field("submitter",   { kind: "PrimitiveType", name: "string" }),
+        field("description", { kind: "ContainerType", container: "Optional", typeArgs: [{ kind: "PrimitiveType", name: "string" }] }),
+        field("submitted_at",{ kind: "PrimitiveType", name: "date" }),
+        field("status",      { kind: "TypeRef", name: "ReviewStatus" }),
       ],
       loc: {
         start: { file: "p0-domain-model.strux", line: 7, col: 1 },
@@ -105,10 +106,13 @@ const P1_SOURCE_FILE: SourceFile = {
     {
       kind: "TypeRecord",
       name: "IntakeForm",
+      external: false,
+      timestamps: false,
+      annotations: [],
       fields: [
-        { name: "id", type: { kind: "PrimitiveType", name: "string" } },
-        { name: "title", type: { kind: "PrimitiveType", name: "string" } },
-        { name: "submitter", type: { kind: "PrimitiveType", name: "string" } },
+        field("id",        { kind: "PrimitiveType", name: "string" }),
+        field("title",     { kind: "PrimitiveType", name: "string" }),
+        field("submitter", { kind: "PrimitiveType", name: "string" }),
       ],
       loc: {
         start: { file: "p1-intake.strux", line: 1, col: 1 },
@@ -242,10 +246,7 @@ describe("verifyLock — E_LOCK_MISMATCH", () => {
       "status:       ReviewStatus",
       "status:       ReviewStatus\n  priority: string"
     );
-    const extraField: FieldDecl = {
-      name: "priority",
-      type: { kind: "PrimitiveType", name: "string" },
-    };
+    const extraField: FieldDecl = field("priority", { kind: "PrimitiveType", name: "string" });
     const baseType = P0_SOURCE_FILE.types[0]!;
     if (baseType.kind !== "TypeRecord") throw new Error("expected TypeRecord");
     const modifiedSourceFile: SourceFile = {
@@ -390,18 +391,16 @@ describe("C1 — loc fields excluded from hash (reformat-stable hashes)", () => 
     // Same types, different loc positions (simulating a reformat)
     const sourceFileA: SourceFile = {
       types: [{
-        kind: "TypeRecord",
-        name: "Item",
-        fields: [{ name: "id", type: { kind: "PrimitiveType", name: "string" } }],
+        kind: "TypeRecord", name: "Item", external: false, timestamps: false, annotations: [],
+        fields: [field("id", { kind: "PrimitiveType", name: "string" })],
         loc: { start: { file: "a.strux", line: 1, col: 1 }, end: { file: "a.strux", line: 3, col: 1 } },
       }],
       panels: [],
     };
     const sourceFileB: SourceFile = {
       types: [{
-        kind: "TypeRecord",
-        name: "Item",
-        fields: [{ name: "id", type: { kind: "PrimitiveType", name: "string" } }],
+        kind: "TypeRecord", name: "Item", external: false, timestamps: false, annotations: [],
+        fields: [field("id", { kind: "PrimitiveType", name: "string" })],
         // Different loc — as if the type was moved down 10 lines
         loc: { start: { file: "a.strux", line: 11, col: 1 }, end: { file: "a.strux", line: 13, col: 1 } },
       }],

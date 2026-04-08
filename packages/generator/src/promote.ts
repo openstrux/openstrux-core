@@ -7,7 +7,7 @@
  * to reshape the nodes for the generator adapter.
  */
 
-import type { StruxNode, ParseTypeExpr, KnotValue } from "@openstrux/parser";
+import type { StruxNode, ParseTypeExpr, KnotValue, ParseFieldAnnotation, ParseBlockAnnotation } from "@openstrux/parser";
 import type {
   TypeRecord,
   TypeEnum,
@@ -17,6 +17,8 @@ import type {
   TypeExpr,
   UnionVariant,
   FieldDecl,
+  FieldAnnotation,
+  TypeBlockAnnotation,
   AccessContext,
 } from "@openstrux/ast";
 import type { TopLevelNode } from "./types.js";
@@ -91,6 +93,18 @@ const ARG_KEYS: Readonly<Record<string, ReadonlySet<string>>> = {
 };
 
 // ---------------------------------------------------------------------------
+// ParseFieldAnnotation / ParseBlockAnnotation → IR annotation types
+// ---------------------------------------------------------------------------
+
+function promoteFieldAnnotation(pa: ParseFieldAnnotation): FieldAnnotation {
+  return pa as unknown as FieldAnnotation;
+}
+
+function promoteBlockAnnotation(pa: ParseBlockAnnotation): TypeBlockAnnotation {
+  return pa as unknown as TypeBlockAnnotation;
+}
+
+// ---------------------------------------------------------------------------
 // StruxNode → TopLevelNode promotion
 // ---------------------------------------------------------------------------
 
@@ -102,9 +116,13 @@ export function promote(ast: StruxNode[]): TopLevelNode[] {
       const promoted: TypeRecord = {
         kind: "TypeRecord",
         name: node.name,
+        ...(node.external !== undefined ? { external: node.external } : {}),
+        ...(node.timestamps !== undefined ? { timestamps: node.timestamps } : {}),
+        annotations: (node.blockAnnotations ?? []).map(promoteBlockAnnotation),
         fields: node.fields.map((f): FieldDecl => ({
           name: f.name,
           type: promoteTypeExpr(f.type),
+          annotations: (f.annotations ?? []).map(promoteFieldAnnotation),
         })),
       };
       result.push(promoted);
