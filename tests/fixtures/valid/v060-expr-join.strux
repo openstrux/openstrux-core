@@ -1,0 +1,22 @@
+// fixture: v060-expr-join
+// expect: valid
+// covers: expression lowering — join rod with portable join condition (v0.6.0)
+// operators: left.field == right.field, composite && join
+
+@type User {
+  id:   string
+  name: string
+}
+
+@type Order {
+  id:      string
+  user_id: string
+  amount:  number
+}
+
+@panel expr-join {
+  @dp { controller: "Example Corp", record: "EJ-001" }
+  @access { purpose: "data_enrichment", operation: "read" }
+  r = receive { trigger: http { method: "GET", path: "/orders/enriched" } }
+  j = join { on: left.id == right.user_id }
+}

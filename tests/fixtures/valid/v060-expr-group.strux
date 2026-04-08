@@ -1,0 +1,18 @@
+// fixture: v060-expr-group
+// expect: valid
+// covers: expression lowering — group rod with portable group key (v0.6.0)
+// Note: single-field key; composite key tested in unit tests (captureRawExpr stops at comma)
+
+@type EventRecord {
+  id:       string
+  category: string
+  region:   string
+  value:    number
+}
+
+@panel expr-group {
+  @dp { controller: "Example Corp", record: "EG-001" }
+  @access { purpose: "analytics", operation: "read" }
+  r = receive { trigger: http { method: "GET", path: "/events/grouped" } }
+  g = group { fn: count(*), key: category }
+}

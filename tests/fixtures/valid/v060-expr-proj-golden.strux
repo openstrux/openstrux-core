@@ -1,0 +1,10 @@
+// fixture: v060-expr-proj-golden
+// expect: valid
+// covers: expression lowering golden — transform with portable projection (include + exclude)
+
+@panel expr-proj-golden {
+  @dp { controller: "Example Corp", record: "EPG-001" }
+  @access { purpose: "data_transform", operation: "transform" }
+  r = receive { trigger: http { method: "GET", path: "/data" } }
+  t = transform { fields: [id, name, -secret] }
+}

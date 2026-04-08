@@ -1,0 +1,10 @@
+// fixture: i060-expr-incomplete-compare
+// expect: invalid — E016 (Expected literal value after comparison operator)
+// covers: expression parser error — predicate with trailing operator and no RHS
+
+@panel bad-expr {
+  @dp { controller: "Example Corp", record: "IE-001" }
+  @access { purpose: "data_filter", operation: "read" }
+  r = receive { trigger: http { method: "GET", path: "/data" } }
+  f = filter { predicate: status == }
+}

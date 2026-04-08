@@ -50,17 +50,17 @@ describe("promote — @type enum", () => {
 // ---------------------------------------------------------------------------
 
 describe("D1 — arg/cfg split per rod type", () => {
-  it("puts filter.where into arg, not cfg", () => {
+  it("puts filter.predicate into arg, not cfg", () => {
     const { ast } = parse(`@panel p {
   @access { purpose: "test", operation: "read" }
-  f = filter { where: item.active }
+  f = filter { predicate: status == "active" }
 }`);
     const nodes = promote(ast);
     const panel = nodes.find((n): n is Panel => n.kind === "Panel");
     const rod = panel?.rods.find((r: Rod) => r.name === "f");
     expect(rod).toBeDefined();
-    expect(rod?.arg["where"]).toBeDefined();
-    expect(rod?.cfg["where"]).toBeUndefined();
+    expect(rod?.arg["predicate"]).toBeDefined();
+    expect(rod?.cfg["predicate"]).toBeUndefined();
   });
 
   it("puts transform.map into arg, not cfg", () => {

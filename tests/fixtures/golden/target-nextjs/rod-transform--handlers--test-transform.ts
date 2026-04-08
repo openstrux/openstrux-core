@@ -9,6 +9,6 @@ function transformEval(input: Proposal): EligibilityRecord {
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const body = await req.json();
-  const result = transformEval(body as Proposal);
+  const result = (body as Proposal[]).map((input) => transformEval(input));
   return NextResponse.json(result, { status: 200 });
 }

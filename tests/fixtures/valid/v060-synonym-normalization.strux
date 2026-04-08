@@ -1,0 +1,20 @@
+// fixture: v060-synonym-normalization
+// expect: valid
+// covers: synonym normalizer — SQL/v0.5 forms normalize to C-family with info diagnostics
+// synonyms: AND→&&, OR→||, IS NULL→== null, IS NOT NULL→!= null, NOT x→!x, IN→in
+
+@type Record {
+  status:  string
+  score:   number
+  tag:     string
+  deleted: bool
+}
+
+@panel synonym-normalization {
+  @dp { controller: "Example Corp", record: "SN-001" }
+  @access { purpose: "data_filter", operation: "read" }
+  r  = receive { trigger: http { method: "GET", path: "/records" } }
+  f1 = filter { predicate: status == "active" AND score > 50 }
+  f2 = filter { predicate: status == "pending" OR status == "active" }
+  f3 = filter { predicate: tag IS NOT NULL }
+}

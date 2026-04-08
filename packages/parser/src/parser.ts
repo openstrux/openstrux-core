@@ -10,6 +10,7 @@
 
 import { tokenize, TokenType } from "./lexer.js";
 import type { Token } from "./lexer.js";
+import { argKeyToContext, parseExpression } from "./expression-parser.js";
 import {
   PRIMITIVE_TYPES,
   type Diagnostic,
@@ -965,7 +966,7 @@ export class Parser {
    * - raw expressions: `status == "submitted"`, `env("DB_HOST")`, etc.
    * - nested blocks: `{ key: val }`
    */
-  private parseKnotValue(_key = ""): KnotValue {
+  private parseKnotValue(key = ""): KnotValue {
     const tok = this.peek();
 
     // String literal
@@ -1020,8 +1021,8 @@ export class Parser {
         next.type !== TokenType.EOF &&
         next.type !== TokenType.COLON // shouldn't appear mid-value, but guard
       ) {
-        // Looks like an expression — capture everything as raw text
-        return this.captureRawExpr(startOffset);
+        // Looks like an expression — capture and optionally parse
+        return this.captureAndParseExpr(startOffset, key, tok);
       }
 
       // Simple identifier or type path with no block
@@ -1029,14 +1030,19 @@ export class Parser {
     }
 
     // Anonymous block: { key: val, ... }
+    // Exception: split-routes uses a brace-delimited block as its expression grammar,
+    // so route that to captureAndParseExpr instead of parseKnotBlock.
     if (tok.type === TokenType.LBRACE) {
+      if (argKeyToContext(key) === "split-routes") {
+        return this.captureAndParseExpr(tok.offset, key, tok);
+      }
       const config = this.parseKnotBlock();
       return { kind: "block", config };
     }
 
     // Anything else (operators, UNKNOWN, etc.) — capture as raw expression
     // tok is NOT yet consumed here
-    return this.captureRawExpr(tok.offset);
+    return this.captureAndParseExpr(tok.offset, key, tok);
   }
 
   /**
@@ -1120,6 +1126,28 @@ export class Parser {
 
     const text = this.source.slice(startOffset, exprEnd).trim();
     return { kind: "raw-expr", text };
+  }
+
+  /**
+   * Capture a raw expression, then attempt to parse it as a typed expression
+   * if the arg key maps to an expression context.
+   *
+   * @param startOffset - Byte offset where the expression begins in source.
+   * @param key         - Knot key name (e.g. "predicate", "fields").
+   * @param startTok    - Token at the start of the expression (for diagnostics).
+   */
+  private captureAndParseExpr(startOffset: number, key: string, startTok: Token): KnotValue {
+    const rawVal = this.captureRawExpr(startOffset);
+    if (rawVal.kind !== "raw-expr") return rawVal;
+
+    const context = argKeyToContext(key);
+    if (!context) return rawVal;
+
+    const result = parseExpression(rawVal.text, context, startTok.line, startTok.col);
+    for (const diag of result.diagnostics) {
+      this.diagnostics.push(diag);
+    }
+    return result.value;
   }
 
   // -------------------------------------------------------------------------

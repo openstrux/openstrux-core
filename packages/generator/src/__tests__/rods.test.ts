@@ -339,12 +339,29 @@ describe("Tier 1 emitters: spec scenario requirements", () => {
     expect(handler).toContain("function transformEval(input: unknown): unknown {");
   });
 
-  it("filter: output contains .filter inline expression", () => {
+  it("filter: with PortableFilter predicate emits .filter arrow", () => {
+    const predicate: import("@openstrux/ast").CompareExpr = {
+      kind: "CompareExpr",
+      field: { segments: ["status"] },
+      op: "eq",
+      value: { kind: "string", value: "active" },
+    };
+    const rod: Rod = {
+      kind: "Rod", name: "my-filter", rodType: "filter", cfg: {},
+      arg: { predicate: predicate as unknown as Rod["arg"][string] },
+    };
+    const panel = makePanel("test-filter-pred", [makeReceiveRod(), rod]);
+    const files = runGenerate(panel);
+    const handler = files.get("handlers/test-filter-pred.ts") ?? "";
+    expect(handler).toContain(".filter((item) =>");
+  });
+
+  it("filter: without predicate emits pass-through cast", () => {
     const rod: Rod = { kind: "Rod", name: "my-filter", rodType: "filter", cfg: {}, arg: {} };
     const panel = makePanel("test-filter", [makeReceiveRod(), rod]);
     const files = runGenerate(panel);
     const handler = files.get("handlers/test-filter.ts") ?? "";
-    expect(handler).toContain(".filter((item) =>");
+    expect(handler).toContain("as unknown[]");
   });
 
   it("write-data: output contains prisma create call", () => {

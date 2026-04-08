@@ -8,7 +8,7 @@
 import type { Rod, Panel } from "@openstrux/ast";
 import type { GeneratedFile } from "../../types.js";
 import type { ChainStep, ImportDecl } from "./rods/index.js";
-import { dispatchRodStep, getTransformHelper } from "./rods/index.js";
+import { dispatchRodStep, getStepHelper } from "./rods/index.js";
 import { FILE_HEADER } from "./constants.js";
 
 // ---------------------------------------------------------------------------
@@ -132,10 +132,10 @@ export function composeHandler(panelName: string, rods: Rod[], panel: Panel): Ge
   ];
   const mergedImports = mergeImports(allImports);
 
-  // Collect preamble functions (e.g., transform stubs) — emitted before the handler
+  // Collect preamble functions (transform, guard, and any other rod that sets _helperFn)
   const preambles: string[] = [];
   for (const { step } of rodSteps) {
-    const helper = getTransformHelper(step);
+    const helper = getStepHelper(step);
     if (helper !== undefined) preambles.push(helper);
   }
 

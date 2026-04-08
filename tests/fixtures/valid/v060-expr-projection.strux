@@ -1,0 +1,19 @@
+// fixture: v060-expr-projection
+// expect: valid
+// covers: expression lowering — transform rod with portable projection (v0.6.0)
+// operators: include, exclude (-), rename (as), computed field
+
+@type Proposal {
+  id:          string
+  title:       string
+  budget:      number
+  owner_email: string
+  internal:    string
+}
+
+@panel expr-projection {
+  @dp { controller: "Example Corp", record: "EP-001" }
+  @access { purpose: "data_transform", operation: "transform" }
+  r = receive { trigger: http { method: "GET", path: "/proposals" } }
+  t = transform { fields: [id, title, budget, -internal] }
+}

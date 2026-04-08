@@ -1,0 +1,10 @@
+// fixture: i060-expr-complex-like
+// expect: invalid — E020 (complex LIKE with regex pattern — use .matches() instead)
+// covers: synonym normalizer complex LIKE detection → error sentinel → E020
+
+@panel bad-like {
+  @dp { controller: "Example Corp", record: "IL-001" }
+  @access { purpose: "data_filter", operation: "read" }
+  r = receive { trigger: http { method: "GET", path: "/data" } }
+  f = filter { predicate: email LIKE "%@%.com" }
+}

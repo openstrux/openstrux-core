@@ -27,6 +27,15 @@ import { emitPrivateData } from "./standard/private-data.js";
 
 export type { ChainStep, ChainContext, RodStepEmitter, ImportDecl } from "./types.js";
 export { getTransformHelper } from "./transform.js";
+export { getGuardHelper } from "./guard.js";
+
+/**
+ * Extract a preamble helper function from any rod step that stored one in
+ * the `_helperFn` extension field (used by transform, guard, and future emitters).
+ */
+export function getStepHelper(step: ChainStep): string | undefined {
+  return (step as ChainStep & { _helperFn?: string })._helperFn;
+}
 
 // ---------------------------------------------------------------------------
 // Tier classification

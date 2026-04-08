@@ -1,0 +1,18 @@
+// fixture: v060-expr-filter
+// expect: valid
+// covers: expression lowering — filter rod with portable predicate (v0.6.0)
+// operators: ==, !=, >, &&, in range, method call, null coalesce, ternary
+
+@type Submission {
+  status:    string
+  score:     number
+  email:     string
+  owner_id:  string
+}
+
+@panel expr-filter {
+  @dp { controller: "Example Corp", record: "EF-001" }
+  @access { purpose: "data_filter", operation: "read" }
+  r = receive { trigger: http { method: "GET", path: "/submissions" } }
+  f = filter { predicate: status == "active" && score > 50 }
+}

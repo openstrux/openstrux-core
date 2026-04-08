@@ -1,0 +1,17 @@
+// fixture: v060-expr-guard
+// expect: valid
+// covers: expression lowering — guard rod with portable guard policy (v0.6.0)
+// operators: principal.roles.includes(), element field comparison
+
+@type Document {
+  id:       string
+  owner_id: string
+  category: string
+}
+
+@panel expr-guard {
+  @dp { controller: "Example Corp", record: "EGU-001" }
+  @access { purpose: "data_access_control", operation: "read" }
+  r = receive { trigger: http { method: "GET", path: "/documents" } }
+  g = guard { policy: principal.roles.includes("admin") }
+}

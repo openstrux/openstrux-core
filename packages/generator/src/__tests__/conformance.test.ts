@@ -105,3 +105,46 @@ describe("target-nextjs golden conformance: p0-domain-model", () => {
     });
   }
 });
+
+// ---------------------------------------------------------------------------
+// Expression lowering golden conformance — v060-expr-* fixtures
+// ---------------------------------------------------------------------------
+
+const EXPR_GOLDEN_FIXTURES = [
+  "v060-expr-golden",
+  "v060-expr-proj-golden",
+  "v060-expr-guard-golden",
+  "v060-expr-agg-golden",
+] as const;
+
+for (const fixtureName of EXPR_GOLDEN_FIXTURES) {
+  describe(`target-nextjs golden conformance: ${fixtureName}`, () => {
+    const source = readFileSync(join(fixturesDir, `${fixtureName}.strux`), "utf-8");
+    const parseResult = parse(source);
+    const ast = promote(parseResult.ast);
+    const { files, pkg } = build(ast, {}, { framework: "next" });
+    const allFiles = [...files, ...pkg.metadata, ...pkg.entrypoints];
+    const generatedMap = new Map(allFiles.map(f => [f.path, f.content]));
+
+    const prefix = `${fixtureName}--`;
+    const goldenFiles = readdirSync(goldenDir)
+      .filter(f => f.startsWith(prefix))
+      .sort();
+
+    if (goldenFiles.length === 0) {
+      it(`(no golden files found for ${fixtureName})`, () => {
+        expect(goldenFiles.length).toBeGreaterThan(0);
+      });
+    }
+
+    for (const goldenFile of goldenFiles) {
+      const generatedPath = goldenToPath(goldenFile, prefix);
+      it(`${generatedPath} matches golden`, () => {
+        const goldenContent = readFileSync(join(goldenDir, goldenFile), "utf-8");
+        const actualContent = generatedMap.get(generatedPath);
+        expect(actualContent).toBeDefined();
+        expect(normalise(actualContent ?? "")).toEqual(normalise(goldenContent));
+      });
+    }
+  });
+}

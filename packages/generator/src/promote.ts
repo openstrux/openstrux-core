@@ -52,6 +52,21 @@ function promoteTypeExpr(pt: ParseTypeExpr): TypeExpr {
 // KnotValue → suitable value for cfg lookup
 // ---------------------------------------------------------------------------
 
+/**
+ * KnotValue kinds that require promotion to AST nodes.
+ * Anything NOT in this set is already a typed expression node and passes
+ * through directly — no need to update this set when new expression kinds
+ * are added to the KnotValue union.
+ */
+const PRIMITIVE_KNOT_KINDS = new Set(["string", "number", "bool", "duration", "path", "raw-expr", "block"]);
+
+/** KnotValue expression kinds that wrap an inner `.expr` node from the parser. */
+const EXPR_WRAPPER_KINDS = new Set([
+  "portable-filter", "portable-projection", "portable-agg",
+  "portable-group-key", "portable-join-cond", "portable-sort",
+  "portable-split-routes", "portable-guard-policy",
+]);
+
 function promoteKnotValue(kv: KnotValue): unknown {
   if (kv.kind === "string")   return { kind: "LitString", value: kv.value };
   if (kv.kind === "number")   return { kind: "LitNumber", value: kv.value };
@@ -59,8 +74,13 @@ function promoteKnotValue(kv: KnotValue): unknown {
   if (kv.kind === "duration") return { kind: "LitDuration", value: kv.value, unit: kv.unit };
   if (kv.kind === "path")     return { kind: "TypeRef", name: kv.segments.join("."), segments: kv.segments, config: kv.config ? promoteBlock(kv.config) : undefined };
   if (kv.kind === "raw-expr") return { kind: "RawExpr", text: kv.text };
+  // Expression KnotValue wrappers: unwrap to the inner expression node so
+  // rod emitters receive the typed expression directly (e.g. CompareExpr, AndExpr).
+  if (EXPR_WRAPPER_KINDS.has(kv.kind)) return (kv as unknown as { expr: unknown }).expr;
+  // Already a typed expression AST node (fn-ref, source-specific-expr) — pass through directly
+  if (!PRIMITIVE_KNOT_KINDS.has(kv.kind)) return kv;
   // block
-  return promoteBlock(kv.config);
+  return promoteBlock((kv as { config: Record<string, KnotValue> }).config);
 }
 
 function promoteBlock(config: Record<string, KnotValue>): Record<string, unknown> {
@@ -80,14 +100,14 @@ function promoteBlock(config: Record<string, KnotValue>): Record<string, unknown
 // ---------------------------------------------------------------------------
 
 const ARG_KEYS: Readonly<Record<string, ReadonlySet<string>>> = {
-  filter:    new Set(["where"]),
-  guard:     new Set(["allow"]),
-  transform: new Set(["map"]),
-  split:     new Set(["by"]),
+  filter:    new Set(["predicate", "order"]),
+  guard:     new Set(["policy"]),
+  transform: new Set(["fields", "fn", "map"]),
+  split:     new Set(["routes", "by"]),
   call:      new Set(["input"]),
   group:     new Set(["key"]),
   aggregate: new Set(["fn"]),
-  join:      new Set(["key"]),
+  join:      new Set(["on", "key"]),
   store:     new Set(["mode"]),
   merge:     new Set(),
 };

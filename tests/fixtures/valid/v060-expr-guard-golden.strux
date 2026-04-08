@@ -1,0 +1,10 @@
+// fixture: v060-expr-guard-golden
+// expect: valid
+// covers: expression lowering golden — guard with portable policy (role check)
+
+@panel expr-guard-golden {
+  @dp { controller: "Example Corp", record: "EGG-001" }
+  @access { purpose: "data_access", operation: "read" }
+  r = receive { trigger: http { method: "GET", path: "/data" } }
+  g = guard { policy: principal.roles.includes("admin") }
+}

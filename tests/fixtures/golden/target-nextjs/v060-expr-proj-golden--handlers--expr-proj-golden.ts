@@ -2,8 +2,15 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
+function transformT(input: unknown): unknown {
+  return {
+    id: input.id,
+    name: input.name,
+  } as unknown;
+}
+
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const body = await req.json();
-  const result = body as unknown[];
+  const result = (body as unknown[]).map((input) => transformT(input));
   return NextResponse.json(result, { status: 200 });
 }

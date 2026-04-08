@@ -1,0 +1,10 @@
+// fixture: i060-expr-unknown-operator
+// expect: invalid — E020 (Unexpected token in expression)
+// covers: expression parser error — filter predicate using unsupported operator
+
+@panel bad-op {
+  @dp { controller: "Example Corp", record: "IO-001" }
+  @access { purpose: "data_filter", operation: "read" }
+  r = receive { trigger: http { method: "GET", path: "/data" } }
+  f = filter { predicate: status <> "active" }
+}

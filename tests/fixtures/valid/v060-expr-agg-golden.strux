@@ -1,0 +1,10 @@
+// fixture: v060-expr-agg-golden
+// expect: valid
+// covers: expression lowering golden — aggregate with count(*) portable aggregation
+
+@panel expr-agg-golden {
+  @dp { controller: "Example Corp", record: "EAG-001" }
+  @access { purpose: "reporting", operation: "read" }
+  r = receive { trigger: http { method: "GET", path: "/stats" } }
+  a = aggregate { fn: count(*) }
+}

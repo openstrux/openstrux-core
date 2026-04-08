@@ -1,0 +1,10 @@
+// fixture: i060-expr-agg-unknown-fn
+// expect: invalid — E024 (Expected aggregation function, got non-identifier token)
+// covers: expression parser error — aggregate rod with non-identifier in function position
+
+@panel bad-agg {
+  @dp { controller: "Example Corp", record: "IA-001" }
+  @access { purpose: "reporting", operation: "read" }
+  r = receive { trigger: http { method: "GET", path: "/stats" } }
+  a = aggregate { fn: !(score) }
+}

@@ -1,0 +1,18 @@
+// fixture: v060-expr-sort
+// expect: valid
+// covers: expression lowering — sort expression via filter rod order knot (v0.6.0)
+// operators: field desc (single field; multi-field tested in unit tests)
+
+@type Proposal {
+  id:         string
+  score:      number
+  created_at: string
+}
+
+@panel expr-sort {
+  @dp { controller: "Example Corp", record: "ES-001" }
+  @access { purpose: "data_query", operation: "read" }
+  r = receive { trigger: http { method: "GET", path: "/proposals/sorted" } }
+  f = filter { predicate: score > 0
+               order: score desc }
+}

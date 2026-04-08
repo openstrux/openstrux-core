@@ -1,12 +1,26 @@
 /**
  * Expression AST nodes — compiled from expression shorthand.
  *
- * Spec reference: openstrux-spec/specs/core/expression-shorthand.md
+ * Spec reference: openstrux-spec/specs/core/expression-shorthand.md (v0.6.0)
  *                 openstrux-spec/specs/core/ir.md §Expression AST Nodes
- *                 openstrux-spec/specs/core/grammar.md §7
+ *
+ * v0.6.0: Unified C-family expression grammar. SQL-ism nodes (BetweenExpr,
+ * IsNullExpr, LikeExpr, ExistsExpr, HasCheck, CaseWhenExpr) replaced by
+ * general expression nodes (RangeExpr, MembershipExpr, MethodCallExpr,
+ * TernaryExpr). All syntax normalized by the synonym-normalizer before parsing.
  */
 
 import type { FieldPath, NodeBase } from "./common.js";
+
+// ===================================================================
+// General expression — union of predicate and value forms
+// ===================================================================
+
+/**
+ * Union covering both predicate (boolean) and value expression nodes.
+ * Used for lambda bodies and method/function call args that accept either.
+ */
+export type GeneralExpr = PortableFilter | ScalarExpr;
 
 // ===================================================================
 // Top-level expression union
@@ -40,11 +54,10 @@ export type FilterExpr =
 
 export type PortableFilter =
   | CompareExpr
-  | InListExpr
-  | BetweenExpr
-  | IsNullExpr
-  | LikeExpr
-  | ExistsExpr
+  | MembershipExpr
+  | RangeExpr
+  | MethodCallExpr
+  | FieldRefExpr
   | AndExpr
   | OrExpr
   | NotExpr;
@@ -58,36 +71,42 @@ export interface CompareExpr extends NodeBase {
 
 export type CompareOp = "eq" | "ne" | "gt" | "ge" | "lt" | "le";
 
-export interface InListExpr extends NodeBase {
-  readonly kind: "InListExpr";
+/** `field in [a, b, c]` or `field !in [a, b, c]` */
+export interface MembershipExpr extends NodeBase {
+  readonly kind: "MembershipExpr";
   readonly field: FieldPath;
   readonly values: readonly ScalarValue[];
   readonly negated: boolean;
 }
 
-export interface BetweenExpr extends NodeBase {
-  readonly kind: "BetweenExpr";
+/** `field in low..high` (inclusive) or `field in low..<high` (half-open) */
+export interface RangeExpr extends NodeBase {
+  readonly kind: "RangeExpr";
   readonly field: FieldPath;
   readonly low: ScalarValue;
   readonly high: ScalarValue;
+  /** false = `..` inclusive both ends; true = `..<` inclusive low, exclusive high */
+  readonly halfOpen: boolean;
 }
 
-export interface IsNullExpr extends NodeBase {
-  readonly kind: "IsNullExpr";
-  readonly field: FieldPath;
-  readonly negated: boolean;
+/**
+ * Method call on a value: `receiver.method(args)`.
+ * Appears in both PortableFilter (boolean-returning methods like .endsWith(), .includes())
+ * and ScalarExpr (value-returning methods like .upper(), .replace()).
+ */
+export interface MethodCallExpr extends NodeBase {
+  readonly kind: "MethodCallExpr";
+  readonly receiver: ScalarExpr;
+  readonly method: string;
+  readonly args: readonly GeneralExpr[];
 }
 
-export interface LikeExpr extends NodeBase {
-  readonly kind: "LikeExpr";
+/** Bare boolean field reference used as a predicate (e.g. `!archived`) */
+export interface FieldRefExpr extends NodeBase {
+  readonly kind: "FieldRefExpr";
   readonly field: FieldPath;
-  readonly pattern: string;
-  readonly negated: boolean;
-}
-
-export interface ExistsExpr extends NodeBase {
-  readonly kind: "ExistsExpr";
-  readonly field: FieldPath;
+  /** True when accessed via `?.` — `address?.country` */
+  readonly optional: boolean;
 }
 
 export interface AndExpr extends NodeBase {
@@ -128,9 +147,8 @@ export interface KafkaFilter extends NodeBase {
 }
 
 /**
- * Custom filter for custom source-specific expressions.
- * Covers any `prefix: raw_content` not handled by the built-in types above.
- * Pushdown compatibility is determined by matching prefix to source adapter.
+ * Custom filter for source-specific expressions not covered by built-in types.
+ * Covers any `prefix: raw_content` not handled by SqlFilter/MongoFilter/KafkaFilter.
  */
 export interface CustomFilter extends NodeBase {
   readonly kind: "CustomFilter";
@@ -187,24 +205,29 @@ export interface ComputedField extends NodeBase {
 }
 
 // ---------------------------------------------------------------------------
-// Scalar expressions — used in computed fields, CASE WHEN, etc.
+// Scalar expressions — used in computed fields, ternary arms, method args, etc.
 // ---------------------------------------------------------------------------
 
 export type ScalarExpr =
   | FieldRefExpr
   | LiteralExpr
+  | ArrayLitExpr
   | ArithmeticExpr
-  | CoalesceExpr
-  | CaseWhenExpr;
-
-export interface FieldRefExpr extends NodeBase {
-  readonly kind: "FieldRefExpr";
-  readonly field: FieldPath;
-}
+  | TernaryExpr
+  | NullCoalesceExpr
+  | MethodCallExpr
+  | FnCallExpr
+  | LambdaExpr;
 
 export interface LiteralExpr extends NodeBase {
   readonly kind: "LiteralExpr";
   readonly value: ScalarValue;
+}
+
+/** Array literal `[expr, expr, ...]` */
+export interface ArrayLitExpr extends NodeBase {
+  readonly kind: "ArrayLitExpr";
+  readonly elements: readonly ScalarExpr[];
 }
 
 export interface ArithmeticExpr extends NodeBase {
@@ -216,20 +239,40 @@ export interface ArithmeticExpr extends NodeBase {
 
 export type ArithOp = "add" | "sub" | "mul" | "div" | "mod";
 
-export interface CoalesceExpr extends NodeBase {
-  readonly kind: "CoalesceExpr";
+/** `condition ? thenExpr : elseExpr` */
+export interface TernaryExpr extends NodeBase {
+  readonly kind: "TernaryExpr";
+  readonly condition: PortableFilter;
+  readonly then: ScalarExpr;
+  readonly else: ScalarExpr;
+}
+
+/** `left ?? right` — returns left if non-null, else right */
+export interface NullCoalesceExpr extends NodeBase {
+  readonly kind: "NullCoalesceExpr";
+  readonly left: ScalarExpr;
+  readonly right: ScalarExpr;
+}
+
+/**
+ * Built-in function call: `year(created_at)`, `dateDiff("days", a, b)`, etc.
+ * Distinct from MethodCallExpr (which has a receiver object).
+ */
+export interface FnCallExpr extends NodeBase {
+  readonly kind: "FnCallExpr";
+  readonly fn: string;
   readonly args: readonly ScalarExpr[];
 }
 
-export interface CaseWhenExpr extends NodeBase {
-  readonly kind: "CaseWhenExpr";
-  readonly branches: readonly CaseWhenBranch[];
-  readonly elseExpr: ScalarExpr;
-}
-
-export interface CaseWhenBranch {
-  readonly when: PortableFilter;
-  readonly then: ScalarExpr;
+/**
+ * Lambda expression `param => body` used in collection methods:
+ * `tags.any(t => t.priority > 3)`.
+ */
+export interface LambdaExpr extends NodeBase {
+  readonly kind: "LambdaExpr";
+  readonly param: string;
+  /** Body may be a predicate (boolean) or a scalar value. */
+  readonly body: GeneralExpr;
 }
 
 // ===================================================================
@@ -250,16 +293,16 @@ export interface AggCall {
   readonly alias?: string | undefined;
 }
 
-/** Built-in aggregation functions. */
+/** Built-in aggregation functions — canonical lowercase form. */
 export type BasicAggFn =
-  | "COUNT"
-  | "SUM"
-  | "AVG"
-  | "MIN"
-  | "MAX"
-  | "FIRST"
-  | "LAST"
-  | "COLLECT";
+  | "count"
+  | "sum"
+  | "avg"
+  | "min"
+  | "max"
+  | "first"
+  | "last"
+  | "collect";
 
 /** Aggregation function — builtins get autocomplete; custom functions allowed. */
 export type AggFn = BasicAggFn | (string & {});
@@ -269,7 +312,6 @@ export interface SqlAggregation extends NodeBase {
   readonly raw: string;
 }
 
-/** Custom aggregation for custom source-specific expressions. */
 export interface CustomAggregation extends NodeBase {
   readonly kind: "CustomAggregation";
   readonly prefix: string;
@@ -287,20 +329,19 @@ export interface PortableGroupKey extends NodeBase {
   readonly keys: readonly GroupKeyEntry[];
 }
 
-export type GroupKeyEntry = FieldGroupKey | FunctionGroupKey;
+export type GroupKeyEntry = FieldGroupKey | ComputedGroupKey;
 
 export interface FieldGroupKey extends NodeBase {
   readonly kind: "FieldGroupKey";
   readonly field: FieldPath;
 }
 
-export interface FunctionGroupKey extends NodeBase {
-  readonly kind: "FunctionGroupKey";
-  readonly fn: string;
-  readonly field: FieldPath;
+/** Computed group key: `year(created_at)`, `dateTrunc("month", ts)`, etc. */
+export interface ComputedGroupKey extends NodeBase {
+  readonly kind: "ComputedGroupKey";
+  readonly expr: ScalarExpr;
 }
 
-/** Custom group key for custom source-specific expressions. */
 export interface CustomGroupKey extends NodeBase {
   readonly kind: "CustomGroupKey";
   readonly prefix: string;
@@ -323,7 +364,6 @@ export interface KeyMatch {
   readonly right: FieldPath;
 }
 
-/** Custom join condition for custom source-specific expressions. */
 export interface CustomJoinCond extends NodeBase {
   readonly kind: "CustomJoinCond";
   readonly prefix: string;
@@ -343,8 +383,9 @@ export interface PortableSort extends NodeBase {
 
 export interface SortField {
   readonly field: FieldPath;
-  readonly direction: "ASC" | "DESC";
-  readonly nulls?: "FIRST" | "LAST" | undefined;
+  /** Canonical lowercase form. */
+  readonly direction: "asc" | "desc";
+  readonly nulls?: "first" | "last" | undefined;
 }
 
 export interface SqlSort extends NodeBase {
@@ -352,7 +393,6 @@ export interface SqlSort extends NodeBase {
   readonly raw: string;
 }
 
-/** Custom sort for custom source-specific expressions. */
 export interface CustomSort extends NodeBase {
   readonly kind: "CustomSort";
   readonly prefix: string;
@@ -378,45 +418,20 @@ export interface RouteEntry {
 // 8. Guard policy expressions (arg.policy)
 // ===================================================================
 
+/**
+ * Guard policy uses the same grammar as portable filter.
+ * Context references (principal.*, intent.*, element.*, scope.*) are
+ * represented as FieldRefExpr/CompareExpr with field paths that start
+ * with the context domain name. The validator/audit layer identifies
+ * context references by inspecting the leading path segment.
+ */
 export type GuardPolicyExpr =
-  | PortablePolicy
+  | PortableFilter
   | ExternalPolicyRef
   | FunctionRef;
 
-export type PortablePolicy =
-  | ContextCompare
-  | HasCheck
-  | PolicyAnd
-  | PolicyOr
-  | PortableFilter;
-
-export type ContextDomain = "principal" | "intent" | "scope" | "element";
-
-export interface ContextCompare extends NodeBase {
-  readonly kind: "ContextCompare";
-  readonly domain: ContextDomain;
-  readonly field: FieldPath;
-  readonly op: CompareOp;
-  readonly value: ScalarValue;
-}
-
-export interface HasCheck extends NodeBase {
-  readonly kind: "HasCheck";
-  readonly domain: ContextDomain;
-  readonly field: FieldPath;
-  readonly mode: "HAS" | "HAS_ANY" | "HAS_ALL";
-  readonly values: readonly ScalarValue[];
-}
-
-export interface PolicyAnd extends NodeBase {
-  readonly kind: "PolicyAnd";
-  readonly operands: readonly PortablePolicy[];
-}
-
-export interface PolicyOr extends NodeBase {
-  readonly kind: "PolicyOr";
-  readonly operands: readonly PortablePolicy[];
-}
+/** Shorthand alias — guard policy IS a portable filter at the AST level. */
+export type PortablePolicy = PortableFilter;
 
 /** Built-in policy engine prefixes. */
 export type BasicPolicyEngine = "opa" | "cedar";

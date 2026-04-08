@@ -5,15 +5,31 @@
  * The validator promotes parse nodes to resolved IR nodes.
  */
 
+import type {
+  PortableFilter,
+  PortableProjection,
+  PortableAggregation,
+  PortableGroupKey,
+  PortableJoinCond,
+  PortableSort,
+  SplitRoutesExpr,
+  GuardPolicyExpr,
+} from "@openstrux/ast";
+
 // ---------------------------------------------------------------------------
 // Diagnostic
 // ---------------------------------------------------------------------------
 
 export interface Diagnostic {
-  /** Short stable code, e.g. "E001", "W001". */
+  /** Short stable code, e.g. "E001", "W001", "I001". */
   readonly code: string;
   readonly message: string;
-  readonly severity: "error" | "warning";
+  /**
+   * - "error": parse/compile failure, output is invalid
+   * - "warning": suspicious construct, output may still be valid
+   * - "info": informational note (e.g. synonym normalization)
+   */
+  readonly severity: "error" | "warning" | "info";
   /** 1-based line number. */
   readonly line: number;
   /** 1-based column. */
@@ -150,7 +166,12 @@ export interface UnionNode {
  * - duration: typed duration literal, e.g. `5m`, `30s`, `24h`, `7d`
  * - path: identifier path (optionally with inline config block),
  *   e.g. `db.sql.postgres { host: "x" }` or just `Proposal`
- * - raw-expr: expression shorthand captured verbatim, e.g. `status == "submitted"`
+ * - raw-expr: expression shorthand captured verbatim — used before expression
+ *   parsing; the expression parser replaces these with typed expression kinds.
+ * - portable-filter / portable-projection / etc.: typed expression AST nodes
+ *   produced by the expression parser (replaces raw-expr for expression args).
+ * - fn-ref: function reference from `fn: module/path.function` syntax.
+ * - source-specific-expr: source-prefixed raw expression (`sql:`, `mongo:`, etc.).
  * - block: anonymous `{ k: v, ... }` block (used in nested configs)
  */
 export type KnotValue =
@@ -160,6 +181,16 @@ export type KnotValue =
   | { kind: "duration"; value: number; unit: "s" | "m" | "h" | "d" }
   | { kind: "path"; segments: string[]; config?: Record<string, KnotValue> | undefined }
   | { kind: "raw-expr"; text: string }
+  | { kind: "portable-filter"; expr: PortableFilter }
+  | { kind: "portable-projection"; expr: PortableProjection }
+  | { kind: "portable-agg"; expr: PortableAggregation }
+  | { kind: "portable-group-key"; expr: PortableGroupKey }
+  | { kind: "portable-join-cond"; expr: PortableJoinCond }
+  | { kind: "portable-sort"; expr: PortableSort }
+  | { kind: "portable-split-routes"; expr: SplitRoutesExpr }
+  | { kind: "portable-guard-policy"; expr: GuardPolicyExpr }
+  | { kind: "fn-ref"; module: string; fn: string }
+  | { kind: "source-specific-expr"; prefix: string; text: string }
   | { kind: "block"; config: Record<string, KnotValue> };
 
 // ---------------------------------------------------------------------------

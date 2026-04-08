@@ -34,7 +34,7 @@ const [, , command, ...args] = process.argv;
 function printUsage(): void {
   console.log("strux — OpenStrux build tool\n");
   console.log("Usage:");
-  console.log("  strux build [--explain] [--overwrite-schema]  Build .strux files → .openstrux/build/");
+  console.log("  strux build [--no-explain] [--overwrite-schema]  Build .strux files → .openstrux/build/");
   console.log("  strux init    Initialize project (detect stack, write config)");
   console.log("  strux doctor  Check config, adapters, and tsconfig paths");
   console.log("\nOptions:");
@@ -54,7 +54,7 @@ async function main(): Promise<void> {
       break;
     case "build": {
       const overwriteSchema = args.includes("--overwrite-schema");
-      const explain = args.includes("--explain");
+      const explain = !args.includes("--no-explain");
       const projectRoot = args.find(a => !a.startsWith("--"));
       await runBuild(projectRoot, { overwriteSchema, explain });
       break;

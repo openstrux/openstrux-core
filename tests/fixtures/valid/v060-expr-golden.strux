@@ -1,0 +1,11 @@
+// fixture: v060-expr-golden
+// expect: valid
+// covers: expression lowering golden test — filter, transform (projection), guard, aggregation
+// This fixture is parsed and compiled; golden TypeScript output is in tests/fixtures/golden/target-nextjs/
+
+@panel expr-golden {
+  @dp { controller: "Example Corp", record: "EX-001" }
+  @access { purpose: "data_processing", operation: "read" }
+  r = receive { trigger: http { method: "GET", path: "/data" } }
+  f = filter { predicate: status == "active" && score > 50 }
+}

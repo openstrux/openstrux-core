@@ -43,8 +43,17 @@ interface ExpectedJson {
   diagnostics: ExpectedDiagnostic[];
 }
 
-/** Diagnostic codes emitted by the parser (not the validator). */
-const PARSER_CODES = new Set(["E000", "E001", "E002", "E003", "W001"]);
+/** Diagnostic codes emitted by the parser (not the validator).
+ * E000–E003, W001: main parser errors/warnings.
+ * E010–E031: expression parser errors (emitted via captureAndParseExpr).
+ */
+const PARSER_CODES = new Set([
+  "E000", "E001", "E002", "E003", "W001",
+  // Expression parser codes
+  "E010", "E011", "E012", "E013", "E014", "E015", "E016",
+  "E017", "E018", "E019", "E020", "E021", "E022", "E023",
+  "E024", "E025", "E026", "E027", "E028", "E029", "E030", "E031",
+]);
 
 function readExpected(path: string): ExpectedJson {
   return JSON.parse(readFileSync(path, "utf-8")) as ExpectedJson;

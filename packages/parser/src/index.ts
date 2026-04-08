@@ -32,3 +32,7 @@ export { PRIMITIVE_TYPES } from "./types.js";
 // Lexer (for tooling that needs raw tokens)
 export { tokenize, TokenType } from "./lexer.js";
 export type { Token } from "./lexer.js";
+
+// Synonym normalizer
+export { normalizeSynonyms } from "./synonym-normalizer.js";
+export type { NormalizeResult } from "./synonym-normalizer.js";

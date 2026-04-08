@@ -1,0 +1,23 @@
+// fixture: v060-expr-split
+// expect: valid
+// covers: expression lowering — split rod with named routes and portable predicates (v0.6.0)
+// operators: route predicates, default (*) route
+
+@type Application {
+  id:     string
+  score:  number
+  status: string
+}
+
+@panel expr-split {
+  @dp { controller: "Example Corp", record: "ESP-001" }
+  @access { purpose: "routing", operation: "transform" }
+  r = receive { trigger: http { method: "POST", path: "/applications/route" } }
+  s = split {
+    routes: {
+      approved: score >= 70
+      rejected: score < 40
+      review: *
+    }
+  }
+}

@@ -1,0 +1,19 @@
+// fixture: v060-expr-aggregation
+// expect: valid
+// covers: expression lowering — aggregate rod with portable aggregation (v0.6.0)
+// operators: count(*), sum(field), avg(field), min, max
+
+@type OrderEvent {
+  id:     string
+  amount: number
+  status: string
+}
+
+@panel expr-aggregation {
+  @dp { controller: "Example Corp", record: "EA-001" }
+  @access { purpose: "reporting", operation: "read" }
+  r  = receive { trigger: http { method: "GET", path: "/orders/stats" } }
+  a1 = aggregate { fn: count(*) }
+  a2 = aggregate { fn: sum(amount) }
+  a3 = aggregate { fn: avg(amount) }
+}

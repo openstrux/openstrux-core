@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const body = await req.json();
-  const result = body as unknown[];
-  return NextResponse.json(result, { status: 200 });
+  const body = {};
+  const aggregated = (body as unknown[]).length;
+  return NextResponse.json(aggregated, { status: 200 });
 }

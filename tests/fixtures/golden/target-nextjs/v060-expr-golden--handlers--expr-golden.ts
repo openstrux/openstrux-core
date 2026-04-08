@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const body = await req.json();
-  const result = body as unknown[];
+  const body = {};
+  const result = (body as unknown[]).filter((item) => (item.status === "active") && (item.score > 50));
   return NextResponse.json(result, { status: 200 });
 }
